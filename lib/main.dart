@@ -32,12 +32,11 @@ class MyApp extends StatelessWidget {
           border: UnderlineInputBorder(),
         ),
       ),
-      home: const MainMapScreen(),
       routes: {
-        MainMapScreen.routeName: (_) => const MainMapScreen(),
-        LoginScreen.routeName: (_) => const LoginScreen(),
-        RegisterScreen.routeName: (_) => const RegisterScreen(),
-        ChangePasswordScreen.routeName: (_) => const ChangePasswordScreen(),
+        '/': (_) => const MainMapScreen(),
+        '/login': (_) => const LoginScreen(),
+        '/register': (_) => const RegisterScreen(),
+        '/change-password': (_) => const ChangePasswordScreen(),
       },
     );
   }
