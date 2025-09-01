@@ -1,5 +1,16 @@
-# *Paisabai*
-An app for people with disabilities to communicate and share their stories or daily problems. Most apps like Facebook or Reddit have groups for discussions, but they don’t show the location of the problem. We believe this is very important to help people with disabilities find solutions. Even non-disabled people, when they see it, may also help contribute to finding or collecting requirements for solutions.
+# paisabai_app
 
-This app is a project for the SF333 Mobile App Development class at Thammasat University.
+A new Flutter project.
 
+## Getting Started
+
+This project is a starting point for a Flutter application.
+
+A few resources to get you started if this is your first Flutter project:
+
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.

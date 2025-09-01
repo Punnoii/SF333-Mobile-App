@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "899471675960",
+    "project_id": "paisabaiproject",
+    "storage_bucket": "paisabaiproject.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:899471675960:android:7b733835885ddf5e454ccd",
+        "android_client_info": {
+          "package_name": "com.example.paisabai_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBA-NoOxzyV8qdmBEj1Z-oAsZaK5BBvwv8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
