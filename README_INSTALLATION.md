@@ -43,7 +43,26 @@ service cloud.firestore {
 }
 ```
 
-### 4. Cloudinary Setup
+### 4. Firestore Indexes (REQUIRED)
+The app uses collectionGroup queries for real-time comment counting. Create this index in Firebase Console:
+
+**Go to:** [Firebase Console](https://console.firebase.google.com/) → Your Project → Firestore Database → Indexes
+
+**Create Composite Index:**
+1. Click **"Create Index"**
+2. **Collection ID:** `comments`
+3. **Fields to index:**
+   - Field path: `authorId` (Ascending)
+4. **Query scopes:** 
+   - Select **"Collection group"** (for queries across all collections with the same collection ID)
+5. Click **"Create"**
+
+**Or use this direct link:**
+https://console.firebase.google.com/v1/r/project/paisabaiproject/firestore/indexes?create_exemption=ClZwcm9qZWN0cy9wYWlzYWJhaXByb2plY3QvZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL2NvbW1lbnRzL2ZpZWxkcy9hdXRob3JJZBACGgwKCGF1dGhvcklkEAE
+
+**⚠️ Note:** This index is REQUIRED for real-time comment counting to work properly.
+
+### 5. Cloudinary Setup
 Profile images are stored using Cloudinary. Follow these steps:
 
 1. **Create Upload Preset in Cloudinary Dashboard:**

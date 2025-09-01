@@ -142,19 +142,29 @@ class UserProfileScreen extends StatelessWidget {
   }
 
   Widget _getCommentCount() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collectionGroup('comments')
-          .where('authorId', isEqualTo: userId)
-          .snapshots(),
+    return StreamBuilder<int>(
+      stream: _getCommentCountStream(),
       builder: (context, snapshot) {
-        final count = snapshot.data?.docs.length ?? 0;
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Text('...', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold));
+        }
+        
+        final count = snapshot.data ?? 0;
         return Text(
           count.toString(),
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         );
       },
     );
+  }
+
+  Stream<int> _getCommentCountStream() {
+    // Listen to ALL comments changes across all posts
+    return FirebaseFirestore.instance
+        .collectionGroup('comments')
+        .where('authorId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
   }
 
   Widget _getTotalLikes() {

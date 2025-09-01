@@ -153,13 +153,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     return _buildActivityItem('Posts', '$postCount');
                   },
                 ),
-                StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collectionGroup('comments')
-                      .where('authorId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
-                      .snapshots(),
+                StreamBuilder<int>(
+                  stream: _getCommentCountStream(),
                   builder: (context, snapshot) {
-                    final commentCount = snapshot.data?.docs.length ?? 0;
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return _buildActivityItem('Comments', '...');
+                    }
+                    
+                    final commentCount = snapshot.data ?? 0;
                     return _buildActivityItem('Comments', '$commentCount');
                   },
                 ),
@@ -209,14 +210,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildActivityItem(String label, String count) {
+  Stream<int> _getCommentCountStream() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return Stream.value(0);
+    
+    // Listen to ALL comments changes across all posts
+    return FirebaseFirestore.instance
+        .collectionGroup('comments')
+        .where('authorId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  Widget _buildActivityItem(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
-          Text(count, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
     );
