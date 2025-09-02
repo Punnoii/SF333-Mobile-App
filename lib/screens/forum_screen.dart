@@ -129,24 +129,64 @@ class _ForumScreenState extends State<ForumScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Forum', style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.black,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.trending_up, color: Colors.tealAccent),
-            onPressed: () {},
+        title: ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Colors.tealAccent, Colors.cyan],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ).createShader(bounds),
+          child: const Text(
+            'Forum',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
-        ],
+        ),
+        backgroundColor: Colors.black.withOpacity(0.9),
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.black.withOpacity(0.9),
+                Colors.grey[900]!.withOpacity(0.9),
+              ],
+            ),
+          ),
+        ),
       ),
       body: Column(
         children: [
-          // Post creation area
+          // Post creation area with enhanced styling
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF2B2B2B),
-              border: Border(bottom: BorderSide(color: Colors.grey, width: 0.5)),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF2B2B2B),
+                  Colors.grey[800]!,
+                ],
+              ),
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.tealAccent.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -228,16 +268,36 @@ class _ForumScreenState extends State<ForumScreen> {
                       onPressed: _pickImage,
                       icon: const Icon(Icons.image, color: Colors.tealAccent),
                     ),
-                    ElevatedButton(
-                      onPressed: _createPost,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.tealAccent,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Colors.tealAccent, Colors.cyan],
+                        ),
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.tealAccent.withOpacity(0.4),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: _createPost,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.black,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                        child: const Text(
+                          'Post',
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
-                      child: const Text('Post'),
                     ),
                   ],
                 ),
@@ -284,9 +344,12 @@ class _ForumScreenState extends State<ForumScreen> {
                     final data = post.data() as Map<String, dynamic>;
                     final postId = post.id;
 
-                    return _PostWidget(
-                      postId: postId,
-                      content: data['content'] ?? '',
+                    return AnimatedContainer(
+                      duration: Duration(milliseconds: 300 + (index * 50)),
+                      curve: Curves.easeOutBack,
+                      child: _PostWidget(
+                        postId: postId,
+                        content: data['content'] ?? '',
                       authorEmail: data['authorEmail'] ?? 'Unknown',
                       authorId: data['authorId'] ?? '',
                       imageUrl: data['imageUrl'],
@@ -303,6 +366,7 @@ class _ForumScreenState extends State<ForumScreen> {
                         );
                       },
                       onDelete: () => _deletePost(postId),
+                      ),
                     );
                   },
                 );
@@ -379,16 +443,42 @@ class _PostWidgetState extends State<_PostWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Card(
+        elevation: 8,
+        shadowColor: Colors.tealAccent.withOpacity(0.2),
+        color: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF2B2B2B),
+                Colors.grey[800]!.withOpacity(0.9),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.tealAccent.withOpacity(0.1),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Row(
             children: [
               FutureBuilder<DocumentSnapshot>(
@@ -519,14 +609,18 @@ class _PostWidgetState extends State<_PostWidget> {
           const SizedBox(height: 12),
           Row(
             children: [
-              IconButton(
-                icon: Icon(
-                  isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: isLiked ? Colors.red : Colors.grey,
+              AnimatedScale(
+                scale: isLiked ? 1.2 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: IconButton(
+                  icon: Icon(
+                    isLiked ? Icons.favorite : Icons.favorite_border,
+                    color: isLiked ? Colors.red : Colors.grey,
+                  ),
+                  onPressed: () {
+                    widget.onLike(!isLiked);
+                  },
                 ),
-                onPressed: () {
-                  widget.onLike(!isLiked);
-                },
               ),
               Text('${widget.likes}'),
               const SizedBox(width: 16),
@@ -538,7 +632,9 @@ class _PostWidgetState extends State<_PostWidget> {
               const Spacer(),
             ],
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

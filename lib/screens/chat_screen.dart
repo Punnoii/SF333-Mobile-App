@@ -10,34 +10,46 @@ import '../services/cloudinary_service.dart';
 class ChatScreen extends StatefulWidget {
   final String chatId;
   final String otherUserName;
+  final String otherUserId;
   
   const ChatScreen({
     super.key,
     required this.chatId,
     required this.otherUserName,
+    required this.otherUserId,
   });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ImagePicker _picker = ImagePicker();
   File? _selectedImage;
+  late AnimationController _sendButtonController;
+  late Animation<double> _sendButtonAnimation;
 
   @override
   void initState() {
     super.initState();
     _markChatAsRead();
+    _sendButtonController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _sendButtonAnimation = Tween<double>(begin: 1.0, end: 0.9).animate(
+      CurvedAnimation(parent: _sendButtonController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _sendButtonController.dispose();
     super.dispose();
   }
 
@@ -69,6 +81,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty && _selectedImage == null) return;
     
+    _sendButtonController.forward().then((_) => _sendButtonController.reverse());
+    
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -78,13 +92,11 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       String? imageUrl;
       
-      // Upload image if selected
       if (_selectedImage != null) {
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         imageUrl = await CloudinaryService.uploadProfileImage(_selectedImage!, 'chat_${user.uid}_$timestamp');
       }
 
-      // Add message to chat
       await _firestore
           .collection('chats')
           .doc(widget.chatId)
@@ -97,7 +109,6 @@ class _ChatScreenState extends State<ChatScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // Update chat with last message info
       await _firestore.collection('chats').doc(widget.chatId).update({
         'lastMessage': imageUrl != null ? '📷 Photo' : messageText,
         'lastMessageTimestamp': FieldValue.serverTimestamp(),
@@ -108,7 +119,6 @@ class _ChatScreenState extends State<ChatScreen> {
         _selectedImage = null;
       });
 
-      // Scroll to bottom
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
@@ -152,109 +162,67 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             FutureBuilder<DocumentSnapshot>(
               future: FirebaseFirestore.instance
-                  .collection('chats')
-                  .doc(widget.chatId)
+                  .collection('users')
+                  .doc(widget.otherUserId)
                   .get(),
-              builder: (context, chatSnapshot) {
-                if (!chatSnapshot.hasData) {
-                  return Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 16,
-                        child: Icon(Icons.person, size: 20),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data!.exists) {
+                  final userData = snapshot.data!.data() as Map<String, dynamic>;
+                  final username = userData['username'] ?? '';
+                  final fullName = userData['fullName'] ?? '';
+                  final displayName = username.isNotEmpty ? username : 
+                                    (fullName.isNotEmpty ? fullName : widget.otherUserName);
+                  
+                  return ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Colors.tealAccent, Colors.cyan],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ).createShader(bounds),
+                    child: Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      const SizedBox(width: 8),
-                      Text(widget.otherUserName),
-                    ],
+                    ),
+                  );
+                } else {
+                  return ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Colors.tealAccent, Colors.cyan],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ).createShader(bounds),
+                    child: Text(
+                      widget.otherUserName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
                   );
                 }
-                
-                final chatData = chatSnapshot.data!.data() as Map<String, dynamic>?;
-                final participants = List<String>.from(chatData?['participants'] ?? []);
-                final otherUserId = participants.firstWhere(
-                  (id) => id != user?.uid,
-                  orElse: () => '',
-                );
-                
-                if (otherUserId.isEmpty) {
-                  return Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 16,
-                        child: Icon(Icons.person, size: 20),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(widget.otherUserName),
-                    ],
-                  );
-                }
-                
-                return FutureBuilder<DocumentSnapshot>(
-                  future: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(otherUserId)
-                      .get(),
-                  builder: (context, userSnapshot) {
-                    if (!userSnapshot.hasData) {
-                      return Row(
-                        children: [
-                          const CircleAvatar(
-                            radius: 16,
-                            child: Icon(Icons.person, size: 20),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(widget.otherUserName),
-                        ],
-                      );
-                    }
-                    
-                    final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
-                    final profileImageUrl = userData?['profileImageUrl'];
-                    final displayName = userData?['username'] ?? userData?['fullName'] ?? widget.otherUserName;
-                    
-                    return Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Colors.grey[800],
-                          child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                              ? ClipOval(
-                                  child: CachedNetworkImage(
-                                    imageUrl: profileImageUrl,
-                                    width: 32,
-                                    height: 32,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => const CircularProgressIndicator(),
-                                    errorWidget: (context, url, error) => const Icon(Icons.person, size: 20),
-                                  ),
-                                )
-                              : const Icon(Icons.person, size: 20),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(displayName),
-                      ],
-                    );
-                  },
-                );
               },
             ),
           ],
         ),
-        backgroundColor: Colors.black,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.call),
-            onPressed: () {
-              // TODO: Implement call functionality
-            },
+        backgroundColor: Colors.black.withOpacity(0.9),
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.black.withOpacity(0.9),
+                Colors.grey[900]!.withOpacity(0.9),
+              ],
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              // TODO: Implement more options
-            },
-          ),
-        ],
+        ),
       ),
       body: Column(
         children: [
@@ -267,23 +235,30 @@ class _ChatScreenState extends State<ChatScreen> {
                   .orderBy('timestamp', descending: false)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.tealAccent),
+                  );
                 }
 
-                final messages = snapshot.data?.docs ?? [];
-
-                if (messages.isEmpty) {
-                  return const Center(child: Text('No messages yet. Start the conversation!'));
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No messages yet. Start the conversation!',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  );
                 }
+
+                final messages = snapshot.data!.docs;
 
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (_scrollController.hasClients) {
-                    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                    _scrollController.animateTo(
+                      _scrollController.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
+                    );
                   }
                 });
 
@@ -297,144 +272,227 @@ class _ChatScreenState extends State<ChatScreen> {
                     final messageId = message.id;
                     final isMe = data['senderId'] == user?.uid;
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!isMe) ...[
-                            FutureBuilder<DocumentSnapshot>(
-                              future: FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(data['senderId'])
-                                  .get(),
-                              builder: (context, snapshot) {
-                                final userData = snapshot.data?.data() as Map<String, dynamic>?;
-                                final profileImageUrl = userData?['profileImageUrl'];
-                                
-                                return CircleAvatar(
-                                  radius: 16,
-                                  backgroundColor: Colors.grey[800],
-                                  child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                                      ? ClipOval(
-                                          child: CachedNetworkImage(
-                                            imageUrl: profileImageUrl,
-                                            width: 32,
-                                            height: 32,
-                                            fit: BoxFit.cover,
-                                            placeholder: (context, url) => const CircularProgressIndicator(),
-                                            errorWidget: (context, url, error) => const Icon(Icons.person, size: 20),
+                    return TweenAnimationBuilder<double>(
+                      duration: Duration(milliseconds: 300 + (index * 50)),
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      builder: (context, value, child) {
+                        return Transform.translate(
+                          offset: Offset(0, 20 * (1 - value)),
+                          child: Opacity(
+                            opacity: value,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (!isMe) ...[
+                                    FutureBuilder<DocumentSnapshot>(
+                                      future: FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(data['senderId'])
+                                          .get(),
+                                      builder: (context, snapshot) {
+                                        final userData = snapshot.data?.data() as Map<String, dynamic>?;
+                                        final profileImageUrl = userData?['profileImageUrl'];
+                                        
+                                        return Container(
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.tealAccent.withOpacity(0.2),
+                                                blurRadius: 8,
+                                                spreadRadius: 1,
+                                              ),
+                                            ],
                                           ),
-                                        )
-                                      : const Icon(Icons.person, size: 20),
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Flexible(
-                            child: GestureDetector(
-                              onLongPress: isMe ? () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Delete Message'),
-                                    content: const Text('Are you sure you want to delete this message?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                          _deleteMessage(messageId);
-                                        },
-                                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              } : null,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: isMe ? Colors.tealAccent : const Color(0xFF2B2B2B),
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty) ...[
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: CachedNetworkImage(
-                                          imageUrl: data['imageUrl'],
-                                          width: 200,
-                                          fit: BoxFit.cover,
-                                          placeholder: (context, url) => const CircularProgressIndicator(),
-                                          errorWidget: (context, url, error) => Container(
-                                            height: 100,
-                                            color: Colors.grey[800],
-                                            child: const Icon(Icons.broken_image),
+                                          child: CircleAvatar(
+                                            radius: 16,
+                                            backgroundColor: Colors.grey[800],
+                                            child: profileImageUrl != null && profileImageUrl.isNotEmpty
+                                                ? ClipOval(
+                                                    child: CachedNetworkImage(
+                                                      imageUrl: profileImageUrl,
+                                                      width: 32,
+                                                      height: 32,
+                                                      fit: BoxFit.cover,
+                                                      placeholder: (context, url) => const CircularProgressIndicator(),
+                                                      errorWidget: (context, url, error) => const Icon(Icons.person, size: 20),
+                                                    ),
+                                                  )
+                                                : const Icon(Icons.person, size: 20),
                                           ),
-                                        ),
-                                      ),
-                                      if (data['content'] != null && data['content'].toString().isNotEmpty)
-                                        const SizedBox(height: 8),
-                                    ],
-                                    if (data['content'] != null && data['content'].toString().isNotEmpty)
-                                      Text(
-                                        data['content'],
-                                        style: TextStyle(
-                                          color: isMe ? Colors.black : Colors.white,
-                                        ),
-                                      ),
-                                    if (data['timestamp'] != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          DateFormat('h:mm a').format(
-                                            (data['timestamp'] as Timestamp).toDate(),
-                                          ),
-                                          style: TextStyle(
-                                            color: isMe ? Colors.black54 : Colors.grey,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
                                   ],
-                                ),
+                                  Flexible(
+                                    child: GestureDetector(
+                                      onLongPress: isMe ? () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            backgroundColor: Colors.grey[900],
+                                            title: const Text('Delete Message'),
+                                            content: const Text('Are you sure you want to delete this message?'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(context),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: const LinearGradient(
+                                                    colors: [Colors.red, Colors.redAccent],
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: TextButton(
+                                                  onPressed: () {
+                                                    Navigator.pop(context);
+                                                    _deleteMessage(messageId);
+                                                  },
+                                                  child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      } : null,
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        decoration: BoxDecoration(
+                                          gradient: isMe 
+                                              ? const LinearGradient(
+                                                  colors: [Colors.tealAccent, Colors.cyan],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                )
+                                              : LinearGradient(
+                                                  colors: [
+                                                    const Color(0xFF2B2B2B),
+                                                    Colors.grey[800]!,
+                                                  ],
+                                                ),
+                                          borderRadius: BorderRadius.circular(20),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: isMe 
+                                                  ? Colors.tealAccent.withOpacity(0.3)
+                                                  : Colors.black.withOpacity(0.2),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty) ...[
+                                              ClipRRect(
+                                                borderRadius: BorderRadius.circular(12),
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black.withOpacity(0.2),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(0, 2),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: CachedNetworkImage(
+                                                    imageUrl: data['imageUrl'],
+                                                    width: 200,
+                                                    fit: BoxFit.cover,
+                                                    placeholder: (context, url) => Container(
+                                                      height: 100,
+                                                      child: const Center(
+                                                        child: CircularProgressIndicator(color: Colors.tealAccent),
+                                                      ),
+                                                    ),
+                                                    errorWidget: (context, url, error) => Container(
+                                                      height: 100,
+                                                      color: Colors.grey[800],
+                                                      child: const Icon(Icons.broken_image),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              if (data['content'] != null && data['content'].toString().isNotEmpty)
+                                                const SizedBox(height: 8),
+                                            ],
+                                            if (data['content'] != null && data['content'].toString().isNotEmpty)
+                                              Text(
+                                                data['content'],
+                                                style: TextStyle(
+                                                  color: isMe ? Colors.black : Colors.white,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                            if (data['timestamp'] != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 6),
+                                                child: Text(
+                                                  DateFormat('h:mm a').format(
+                                                    (data['timestamp'] as Timestamp).toDate(),
+                                                  ),
+                                                  style: TextStyle(
+                                                    color: isMe ? Colors.black54 : Colors.grey,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (isMe) ...[
+                                    const SizedBox(width: 8),
+                                    FutureBuilder<DocumentSnapshot>(
+                                      future: FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(user!.uid)
+                                          .get(),
+                                      builder: (context, snapshot) {
+                                        final profileImageUrl = snapshot.data?.data() != null
+                                            ? (snapshot.data!.data() as Map<String, dynamic>)['profileImageUrl']
+                                            : null;
+                                        
+                                        return Container(
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.tealAccent.withOpacity(0.2),
+                                                blurRadius: 8,
+                                                spreadRadius: 1,
+                                              ),
+                                            ],
+                                          ),
+                                          child: CircleAvatar(
+                                            radius: 16,
+                                            backgroundImage: profileImageUrl != null && profileImageUrl.toString().isNotEmpty
+                                                ? CachedNetworkImageProvider(profileImageUrl)
+                                                : null,
+                                            child: profileImageUrl == null || profileImageUrl.toString().isEmpty
+                                                ? const Icon(Icons.person, size: 20)
+                                                : null,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ),
-                          if (isMe) ...[
-                            const SizedBox(width: 8),
-                            FutureBuilder<DocumentSnapshot>(
-                              future: FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(user!.uid)
-                                  .get(),
-                              builder: (context, snapshot) {
-                                final profileImageUrl = snapshot.data?.data() != null
-                                    ? (snapshot.data!.data() as Map<String, dynamic>)['profileImageUrl']
-                                    : null;
-                                
-                                return CircleAvatar(
-                                  radius: 16,
-                                  backgroundImage: profileImageUrl != null && profileImageUrl.toString().isNotEmpty
-                                      ? CachedNetworkImageProvider(profileImageUrl)
-                                      : null,
-                                  child: profileImageUrl == null || profileImageUrl.toString().isEmpty
-                                      ? const Icon(Icons.person, size: 20)
-                                      : null,
-                                );
-                              },
-                            ),
-                          ],
-                        ],
-                      ),
+                        );
+                      },
                     );
                   },
                 );
@@ -443,22 +501,49 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF2B2B2B),
-              border: Border(top: BorderSide(color: Colors.grey, width: 0.5)),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF2B2B2B),
+                  Colors.grey[900]!,
+                ],
+              ),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.tealAccent.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
             ),
             child: Column(
               children: [
                 if (_selectedImage != null) ...[
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.only(bottom: 12),
                     child: Stack(
                       children: [
                         Container(
-                          height: 100,
+                          height: 120,
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                             image: DecorationImage(
                               image: FileImage(_selectedImage!),
                               fit: BoxFit.cover,
@@ -466,8 +551,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         Positioned(
-                          top: 4,
-                          right: 4,
+                          top: 8,
+                          right: 8,
                           child: GestureDetector(
                             onTap: () {
                               setState(() {
@@ -475,11 +560,21 @@ class _ChatScreenState extends State<ChatScreen> {
                               });
                             },
                             child: Container(
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Colors.red, Colors.redAccent],
+                                ),
                                 shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.red.withOpacity(0.4),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
                               ),
-                              child: const Icon(Icons.close, color: Colors.white, size: 20),
+                              padding: const EdgeInsets.all(6),
+                              child: const Icon(Icons.close, color: Colors.white, size: 18),
                             ),
                           ),
                         ),
@@ -489,24 +584,76 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
                 Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.camera_alt),
-                      onPressed: _pickImage,
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: _messageController,
-                        decoration: const InputDecoration(
-                          hintText: 'Type a message...',
-                          border: InputBorder.none,
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Colors.tealAccent, Colors.cyan],
                         ),
-                        maxLines: null,
-                        onSubmitted: (_) => _sendMessage(),
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.tealAccent.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.camera_alt, color: Colors.black),
+                        onPressed: _pickImage,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.send),
-                      onPressed: _sendMessage,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800],
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(
+                            color: Colors.tealAccent.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: const InputDecoration(
+                            hintText: 'Type a message...',
+                            hintStyle: TextStyle(color: Colors.grey),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          maxLines: null,
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    AnimatedBuilder(
+                      animation: _sendButtonAnimation,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _sendButtonAnimation.value,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Colors.tealAccent, Colors.cyan],
+                              ),
+                              borderRadius: BorderRadius.circular(25),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.tealAccent.withOpacity(0.4),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.send, color: Colors.black),
+                              onPressed: _sendMessage,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

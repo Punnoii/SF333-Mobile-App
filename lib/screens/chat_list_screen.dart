@@ -150,6 +150,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             builder: (_) => ChatScreen(
                               chatId: chatId,
                               otherUserName: otherUserName,
+                              otherUserId: otherUserId,
                             ),
                           ),
                         );
@@ -287,6 +288,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             builder: (_) => ChatScreen(
               chatId: chatId!,
               otherUserName: userData['username'] ?? userData['fullName'] ?? userData['email']?.split('@')[0] ?? 'Unknown',
+              otherUserId: otherUserId,
             ),
           ),
         );
