@@ -28,11 +28,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chats'),
+        title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: Colors.black,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
+            icon: const Icon(Icons.search, color: Colors.tealAccent),
             onPressed: () {
               // TODO: Implement search functionality
             },
@@ -56,7 +57,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
           final chats = snapshot.data?.docs ?? [];
 
           if (chats.isEmpty) {
-            return const Center(child: Text('No chats yet'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[600]),
+                  const SizedBox(height: 16),
+                  Text('No chats yet', style: TextStyle(fontSize: 18, color: Colors.grey[400])),
+                  const SizedBox(height: 8),
+                  Text('Tap + to start a new conversation', style: TextStyle(color: Colors.grey[600])),
+                ],
+              ),
+            );
           }
 
           return ListView.builder(
@@ -78,47 +90,71 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
                   final otherUserName = userData?['email']?.split('@')[0] ?? 'Unknown';
 
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.grey[800],
-                      child: userData?['profileImageUrl'] != null
-                          ? ClipOval(
-                              child: CachedNetworkImage(
-                                imageUrl: userData!['profileImageUrl'],
-                                width: 40,
-                                height: 40,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => const CircularProgressIndicator(),
-                                errorWidget: (context, url, error) => const Icon(Icons.person),
-                              ),
-                            )
-                          : const Icon(Icons.person),
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[800]!, width: 0.5),
                     ),
-                    title: Text(otherUserName),
-                    subtitle: Text(
-                      data['lastMessage'] ?? 'No messages yet',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: data['lastMessageTime'] != null
-                        ? Text(
-                            DateFormat('MMM d').format(
-                              (data['lastMessageTime'] as Timestamp).toDate(),
-                            ),
-                            style: const TextStyle(color: Colors.grey, fontSize: 12),
-                          )
-                        : null,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            chatId: chatId,
-                            otherUserName: otherUserName,
-                          ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Colors.grey[800],
+                        child: userData?['profileImageUrl'] != null
+                            ? ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: userData!['profileImageUrl'],
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const CircularProgressIndicator(),
+                                  errorWidget: (context, url, error) => const Icon(Icons.person),
+                                ),
+                              )
+                            : const Icon(Icons.person),
+                      ),
+                      title: Text(
+                        otherUserName,
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          data['lastMessage'] ?? 'No messages yet',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.grey[400], fontSize: 14),
                         ),
-                      );
-                    },
+                      ),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (data['lastMessageTime'] != null)
+                            Text(
+                              DateFormat('MMM d').format(
+                                (data['lastMessageTime'] as Timestamp).toDate(),
+                              ),
+                              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                            ),
+                          const SizedBox(height: 4),
+                          Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
+                        ],
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              chatId: chatId,
+                              otherUserName: otherUserName,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   );
                 },
               );
@@ -130,6 +166,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         onPressed: () {
           _showNewChatDialog();
         },
+        backgroundColor: Colors.tealAccent,
+        foregroundColor: Colors.black,
         child: const Icon(Icons.add),
       ),
     );

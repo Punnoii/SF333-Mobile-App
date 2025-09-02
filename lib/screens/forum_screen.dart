@@ -102,8 +102,15 @@ class _ForumScreenState extends State<ForumScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Forum'),
+        title: const Text('Forum', style: TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: Colors.black,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.trending_up, color: Colors.tealAccent),
+            onPressed: () {},
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -142,15 +149,22 @@ class _ForumScreenState extends State<ForumScreen> {
                   child: TextField(
                     controller: _postController,
                     decoration: const InputDecoration(
-                      hintText: 'What do you want to post?',
+                      hintText: 'What\'s on your mind?',
                       border: InputBorder.none,
                     ),
-                    maxLines: null,
+                    maxLines: 3,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.send),
+                ElevatedButton(
                   onPressed: _createPost,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.tealAccent,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Post'),
                 ),
               ],
             ),
@@ -174,7 +188,18 @@ class _ForumScreenState extends State<ForumScreen> {
                 final posts = snapshot.data?.docs ?? [];
 
                 if (posts.isEmpty) {
-                  return const Center(child: Text('No posts yet. Be the first to post!'));
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.forum_outlined, size: 64, color: Colors.grey[600]),
+                        const SizedBox(height: 16),
+                        Text('No posts yet', style: TextStyle(fontSize: 18, color: Colors.grey[400])),
+                        const SizedBox(height: 8),
+                        Text('Be the first to share something!', style: TextStyle(color: Colors.grey[600])),
+                      ],
+                    ),
+                  );
                 }
 
                 return ListView.builder(
@@ -277,11 +302,11 @@ class _PostWidgetState extends State<_PostWidget> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF2B2B2B),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,24 +378,7 @@ class _PostWidgetState extends State<_PostWidget> {
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => UserProfileScreen(
-                                        userId: widget.authorId,
-                                        userName: widget.authorEmail.split('@')[0],
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: CircleAvatar(
-                                  radius: 16,
-                                  backgroundImage: CachedNetworkImageProvider('https://picsum.photos/200/300'),
-                                  child: const Icon(Icons.person, size: 20),
-                                ),
-                              ),
+                              child: const Text('Cancel'),
                             ),
                             TextButton(
                               onPressed: () {
@@ -421,10 +429,6 @@ class _PostWidgetState extends State<_PostWidget> {
               ),
               Text('${widget.comments}'),
               const Spacer(),
-              TextButton(
-                onPressed: widget.onComment,
-                child: const Text('Reply'),
-              ),
             ],
           ),
         ],

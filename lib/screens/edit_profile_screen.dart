@@ -15,6 +15,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController usernameController = TextEditingController();
+  final TextEditingController fullNameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController disabilityController = TextEditingController();
@@ -44,6 +45,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         setState(() {
           _currentProfileImageUrl = data['profileImageUrl'];
           usernameController.text = data['username'] ?? '';
+          fullNameController.text = data['fullName'] ?? '';
           phoneController.text = data['phoneNumber'] ?? '';
           emailController.text = data['email'] ?? user.email ?? '';
           disabilityController.text = data['disabilityType'] ?? '';
@@ -198,6 +200,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const Text('Username'),
               TextField(controller: usernameController),
               const SizedBox(height: 12),
+              const Text('Full Name'),
+              TextField(controller: fullNameController),
+              const SizedBox(height: 12),
               const Text('Phone number'),
               TextField(controller: phoneController, keyboardType: TextInputType.phone),
               const SizedBox(height: 12),
@@ -238,6 +243,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           .doc(user.uid)
                           .set({
                         'username': usernameController.text.trim(),
+                        'fullName': fullNameController.text.trim(), // Add fullName field
                         'phoneNumber': phoneController.text.trim(),
                         'disabilityType': disabilityController.text.trim(),
                         'profileImageUrl': finalImageUrl ?? '',
