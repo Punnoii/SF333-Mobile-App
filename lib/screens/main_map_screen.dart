@@ -3,7 +3,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'login_screen.dart';
 import 'forum_screen.dart';
 import 'chat_list_screen.dart';
@@ -29,6 +28,47 @@ class _MainMapScreenState extends State<MainMapScreen> {
   LatLng _currentCenter = const LatLng(13.7563, 100.5018);
   bool _showPopup = false;
   LatLng? _selectedLocation;
+  int _unreadChatCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToUnreadMessages();
+  }
+
+  void _listenToUnreadMessages() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    // Listen to all chats where current user is a participant
+    _firestore
+        .collection('chats')
+        .where('participants', arrayContains: currentUser.uid)
+        .snapshots()
+        .listen((chatSnapshot) {
+      int totalUnread = 0;
+      
+      for (var chatDoc in chatSnapshot.docs) {
+        final chatData = chatDoc.data();
+        final lastReadTimestamp = chatData['lastRead_${currentUser.uid}'] as Timestamp?;
+        final lastMessageTimestamp = chatData['lastMessageTimestamp'] as Timestamp?;
+        final lastSenderId = chatData['lastSenderId'] as String?;
+        
+        // If there's a new message after last read and it's not from current user
+        if (lastMessageTimestamp != null && 
+            lastSenderId != currentUser.uid &&
+            (lastReadTimestamp == null || lastMessageTimestamp.compareTo(lastReadTimestamp) > 0)) {
+          totalUnread++;
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _unreadChatCount = totalUnread;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,11 +116,43 @@ class _MainMapScreenState extends State<MainMapScreen> {
           }
           setState(() => currentIndex = i);
         },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.message_outlined), label: 'Chat'),
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.forum_outlined), label: 'Forum'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
+        items: [
+          BottomNavigationBarItem(
+            icon: Stack(
+              children: [
+                const Icon(Icons.message_outlined),
+                if (_unreadChatCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        _unreadChatCount > 99 ? '99+' : _unreadChatCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            label: 'Chat',
+          ),
+          const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
+          const BottomNavigationBarItem(icon: Icon(Icons.forum_outlined), label: 'Forum'),
+          const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
       ),
     );

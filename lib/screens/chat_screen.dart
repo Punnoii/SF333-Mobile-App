@@ -24,10 +24,32 @@ class _ChatScreenState extends State<ChatScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
+  void initState() {
+    super.initState();
+    _markChatAsRead();
+  }
+
+  @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _markChatAsRead() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(widget.chatId)
+          .update({
+        'lastRead_${currentUser.uid}': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error marking chat as read: $e');
+    }
   }
 
   Future<void> _sendMessage() async {
@@ -52,10 +74,11 @@ class _ChatScreenState extends State<ChatScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // Update chat's last message
+      // Update chat with last message info
       await _firestore.collection('chats').doc(widget.chatId).update({
         'lastMessage': messageText,
-        'lastMessageTime': FieldValue.serverTimestamp(),
+        'lastMessageTimestamp': FieldValue.serverTimestamp(),
+        'lastSenderId': user.uid,
       });
 
       // Scroll to bottom
