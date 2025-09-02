@@ -14,15 +14,67 @@ class IncidentDetailScreen extends StatelessWidget {
     required this.incidentId,
   });
 
+  Future<void> _deleteIncident(BuildContext context) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('incidents')
+          .doc(incidentId)
+          .delete();
+      
+      if (context.mounted) {
+        Navigator.pop(context, true); // Return true to indicate deletion
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Incident deleted successfully')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting incident: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final reportedAt = incident['reportedAt'] as Timestamp?;
     final imageUrl = incident['imageUrl'] as String?;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isOwner = currentUser?.uid == incident['reportedBy'];
     
     return Scaffold(
       appBar: AppBar(
         title: Text(incident['title'] ?? 'Incident Details'),
         backgroundColor: Colors.black,
+        actions: [
+          if (isOwner)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Delete Incident'),
+                    content: const Text('Are you sure you want to delete this incident? This action cannot be undone.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _deleteIncident(context);
+                        },
+                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

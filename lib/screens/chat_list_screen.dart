@@ -88,7 +88,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 future: _firestore.collection('users').doc(otherUserId).get(),
                 builder: (context, userSnapshot) {
                   final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
-                  final otherUserName = userData?['email']?.split('@')[0] ?? 'Unknown';
+                  final otherUserName = userData?['username'] ?? userData?['fullName'] ?? userData?['email']?.split('@')[0] ?? 'Unknown';
 
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -180,12 +180,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Start New Chat'),
-        content: TextField(
-          controller: emailController,
-          decoration: const InputDecoration(
-            hintText: 'Enter user email',
-            border: OutlineInputBorder(),
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                hintText: 'Enter email or full name',
+                border: OutlineInputBorder(),
+                helperText: 'You can search by email or full name',
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -204,18 +210,34 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Future<void> _startNewChat(String otherUserEmail) async {
-    if (otherUserEmail.isEmpty) return;
+  Future<void> _startNewChat(String searchTerm) async {
+    if (searchTerm.isEmpty) return;
     
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
-      // Find the other user
-      final userQuery = await _firestore
+      // Search by email first
+      QuerySnapshot userQuery = await _firestore
           .collection('users')
-          .where('email', isEqualTo: otherUserEmail)
+          .where('email', isEqualTo: searchTerm)
           .get();
+
+      // If no results by email, search by fullName
+      if (userQuery.docs.isEmpty) {
+        userQuery = await _firestore
+            .collection('users')
+            .where('fullName', isEqualTo: searchTerm)
+            .get();
+      }
+
+      // If still no results, search by username
+      if (userQuery.docs.isEmpty) {
+        userQuery = await _firestore
+            .collection('users')
+            .where('username', isEqualTo: searchTerm)
+            .get();
+      }
 
       if (userQuery.docs.isEmpty) {
         if (mounted) {
@@ -227,6 +249,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       }
 
       final otherUserId = userQuery.docs.first.id;
+      final userData = userQuery.docs.first.data() as Map<String, dynamic>;
       final participants = [user.uid, otherUserId]..sort();
 
       // Check if chat already exists
@@ -263,7 +286,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           MaterialPageRoute(
             builder: (_) => ChatScreen(
               chatId: chatId!,
-              otherUserName: otherUserEmail.split('@')[0],
+              otherUserName: userData['username'] ?? userData['fullName'] ?? userData['email']?.split('@')[0] ?? 'Unknown',
             ),
           ),
         );

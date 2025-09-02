@@ -3,6 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import '../services/cloudinary_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -22,6 +25,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ImagePicker _picker = ImagePicker();
+  File? _selectedImage;
 
   @override
   void initState() {
@@ -52,8 +57,17 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+
+    setState(() {
+      _selectedImage = File(image.path);
+    });
+  }
+
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
+    if (_messageController.text.trim().isEmpty && _selectedImage == null) return;
     
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -62,6 +76,14 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
 
     try {
+      String? imageUrl;
+      
+      // Upload image if selected
+      if (_selectedImage != null) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        imageUrl = await CloudinaryService.uploadProfileImage(_selectedImage!, 'chat_${user.uid}_$timestamp');
+      }
+
       // Add message to chat
       await _firestore
           .collection('chats')
@@ -71,14 +93,19 @@ class _ChatScreenState extends State<ChatScreen> {
         'content': messageText,
         'senderId': user.uid,
         'senderEmail': user.email,
+        'imageUrl': imageUrl,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
       // Update chat with last message info
       await _firestore.collection('chats').doc(widget.chatId).update({
-        'lastMessage': messageText,
+        'lastMessage': imageUrl != null ? '📷 Photo' : messageText,
         'lastMessageTimestamp': FieldValue.serverTimestamp(),
         'lastSenderId': user.uid,
+      });
+
+      setState(() {
+        _selectedImage = null;
       });
 
       // Scroll to bottom
@@ -93,6 +120,23 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error sending message: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteMessage(String messageId) async {
+    try {
+      await _firestore
+          .collection('chats')
+          .doc(widget.chatId)
+          .collection('messages')
+          .doc(messageId)
+          .delete();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting message: $e')),
         );
       }
     }
@@ -113,9 +157,15 @@ class _ChatScreenState extends State<ChatScreen> {
                   .get(),
               builder: (context, chatSnapshot) {
                 if (!chatSnapshot.hasData) {
-                  return const CircleAvatar(
-                    radius: 16,
-                    child: Icon(Icons.person, size: 20),
+                  return Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 16,
+                        child: Icon(Icons.person, size: 20),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(widget.otherUserName),
+                    ],
                   );
                 }
                 
@@ -127,9 +177,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 );
                 
                 if (otherUserId.isEmpty) {
-                  return const CircleAvatar(
-                    radius: 16,
-                    child: Icon(Icons.person, size: 20),
+                  return Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 16,
+                        child: Icon(Icons.person, size: 20),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(widget.otherUserName),
+                    ],
                   );
                 }
                 
@@ -140,37 +196,48 @@ class _ChatScreenState extends State<ChatScreen> {
                       .get(),
                   builder: (context, userSnapshot) {
                     if (!userSnapshot.hasData) {
-                      return const CircleAvatar(
-                        radius: 16,
-                        child: Icon(Icons.person, size: 20),
+                      return Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 16,
+                            child: Icon(Icons.person, size: 20),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(widget.otherUserName),
+                        ],
                       );
                     }
                     
                     final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
                     final profileImageUrl = userData?['profileImageUrl'];
+                    final displayName = userData?['username'] ?? userData?['fullName'] ?? widget.otherUserName;
                     
-                    return CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Colors.grey[800],
-                      child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? ClipOval(
-                              child: CachedNetworkImage(
-                                imageUrl: profileImageUrl,
-                                width: 32,
-                                height: 32,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => const CircularProgressIndicator(),
-                                errorWidget: (context, url, error) => const Icon(Icons.person, size: 20),
-                              ),
-                            )
-                          : const Icon(Icons.person, size: 20),
+                    return Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: Colors.grey[800],
+                          child: profileImageUrl != null && profileImageUrl.isNotEmpty
+                              ? ClipOval(
+                                  child: CachedNetworkImage(
+                                    imageUrl: profileImageUrl,
+                                    width: 32,
+                                    height: 32,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => const CircularProgressIndicator(),
+                                    errorWidget: (context, url, error) => const Icon(Icons.person, size: 20),
+                                  ),
+                                )
+                              : const Icon(Icons.person, size: 20),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(displayName),
+                      ],
                     );
                   },
                 );
               },
             ),
-            const SizedBox(width: 8),
-            Text(widget.otherUserName),
           ],
         ),
         backgroundColor: Colors.black,
@@ -227,6 +294,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final data = message.data() as Map<String, dynamic>;
+                    final messageId = message.id;
                     final isMe = data['senderId'] == user?.uid;
 
                     return Container(
@@ -266,35 +334,78 @@ class _ChatScreenState extends State<ChatScreen> {
                             const SizedBox(width: 8),
                           ],
                           Flexible(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: isMe ? Colors.tealAccent : const Color(0xFF2B2B2B),
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    data['content'] ?? '',
-                                    style: TextStyle(
-                                      color: isMe ? Colors.black : Colors.white,
-                                    ),
+                            child: GestureDetector(
+                              onLongPress: isMe ? () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Delete Message'),
+                                    content: const Text('Are you sure you want to delete this message?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                          _deleteMessage(messageId);
+                                        },
+                                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
                                   ),
-                                  if (data['timestamp'] != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        DateFormat('h:mm a').format(
-                                          (data['timestamp'] as Timestamp).toDate(),
-                                        ),
-                                        style: TextStyle(
-                                          color: isMe ? Colors.black54 : Colors.grey,
-                                          fontSize: 11,
+                                );
+                              } : null,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: isMe ? Colors.tealAccent : const Color(0xFF2B2B2B),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty) ...[
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: CachedNetworkImage(
+                                          imageUrl: data['imageUrl'],
+                                          width: 200,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) => const CircularProgressIndicator(),
+                                          errorWidget: (context, url, error) => Container(
+                                            height: 100,
+                                            color: Colors.grey[800],
+                                            child: const Icon(Icons.broken_image),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                ],
+                                      if (data['content'] != null && data['content'].toString().isNotEmpty)
+                                        const SizedBox(height: 8),
+                                    ],
+                                    if (data['content'] != null && data['content'].toString().isNotEmpty)
+                                      Text(
+                                        data['content'],
+                                        style: TextStyle(
+                                          color: isMe ? Colors.black : Colors.white,
+                                        ),
+                                      ),
+                                    if (data['timestamp'] != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          DateFormat('h:mm a').format(
+                                            (data['timestamp'] as Timestamp).toDate(),
+                                          ),
+                                          style: TextStyle(
+                                            color: isMe ? Colors.black54 : Colors.grey,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -336,28 +447,68 @@ class _ChatScreenState extends State<ChatScreen> {
               color: Color(0xFF2B2B2B),
               border: Border(top: BorderSide(color: Colors.grey, width: 0.5)),
             ),
-            child: Row(
+            child: Column(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.camera_alt),
-                  onPressed: () {
-                    // TODO: Implement image sharing
-                  },
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      border: InputBorder.none,
+                if (_selectedImage != null) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Stack(
+                      children: [
+                        Container(
+                          height: 100,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            image: DecorationImage(
+                              image: FileImage(_selectedImage!),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedImage = null;
+                              });
+                            },
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close, color: Colors.white, size: 20),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    maxLines: null,
-                    onSubmitted: (_) => _sendMessage(),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
+                ],
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.camera_alt),
+                      onPressed: _pickImage,
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        decoration: const InputDecoration(
+                          hintText: 'Type a message...',
+                          border: InputBorder.none,
+                        ),
+                        maxLines: null,
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.send),
+                      onPressed: _sendMessage,
+                    ),
+                  ],
                 ),
               ],
             ),

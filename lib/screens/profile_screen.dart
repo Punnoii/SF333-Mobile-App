@@ -152,9 +152,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
             const SizedBox(height: 24),
-            Text(
-              _userProfile?['fullName'] ?? _userProfile?['username'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'User',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(FirebaseAuth.instance.currentUser?.uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                final userData = snapshot.data?.data() as Map<String, dynamic>?;
+                final displayName = userData?['username'] ?? userData?['fullName'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'User';
+                
+                return Text(
+                  displayName,
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                );
+              },
             ),
             const SizedBox(height: 8),
             Text(

@@ -3,8 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import 'comment_screen.dart';
 import 'user_profile_screen.dart';
+import '../services/cloudinary_service.dart';
 
 class ForumScreen extends StatefulWidget {
   static const String routeName = '/forum';
@@ -17,6 +20,8 @@ class ForumScreen extends StatefulWidget {
 class _ForumScreenState extends State<ForumScreen> {
   final TextEditingController _postController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ImagePicker _picker = ImagePicker();
+  File? _selectedImage;
 
   @override
   void dispose() {
@@ -24,22 +29,44 @@ class _ForumScreenState extends State<ForumScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+
+    setState(() {
+      _selectedImage = File(image.path);
+    });
+  }
+
   Future<void> _createPost() async {
-    if (_postController.text.trim().isEmpty) return;
+    if (_postController.text.trim().isEmpty && _selectedImage == null) return;
     
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
+      String? imageUrl;
+      
+      // Upload image if selected
+      if (_selectedImage != null) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        imageUrl = await CloudinaryService.uploadProfileImage(_selectedImage!, 'post_${user.uid}_$timestamp');
+      }
+
       await _firestore.collection('posts').add({
         'content': _postController.text.trim(),
         'authorId': user.uid,
         'authorEmail': user.email,
+        'imageUrl': imageUrl,
         'timestamp': FieldValue.serverTimestamp(),
         'likes': 0,
         'comments': 0,
       });
+      
       _postController.clear();
+      setState(() {
+        _selectedImage = null;
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -146,25 +173,73 @@ class _ForumScreenState extends State<ForumScreen> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: TextField(
-                    controller: _postController,
-                    decoration: const InputDecoration(
-                      hintText: 'What\'s on your mind?',
-                      border: InputBorder.none,
-                    ),
-                    maxLines: 3,
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _postController,
+                        decoration: const InputDecoration(
+                          hintText: 'What\'s on your mind?',
+                          border: InputBorder.none,
+                        ),
+                        maxLines: 3,
+                      ),
+                      if (_selectedImage != null) ...[
+                        const SizedBox(height: 8),
+                        Stack(
+                          children: [
+                            Container(
+                              height: 100,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                image: DecorationImage(
+                                  image: FileImage(_selectedImage!),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedImage = null;
+                                  });
+                                },
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: _createPost,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.tealAccent,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                Column(
+                  children: [
+                    IconButton(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.image, color: Colors.tealAccent),
                     ),
-                  ),
-                  child: const Text('Post'),
+                    ElevatedButton(
+                      onPressed: _createPost,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.tealAccent,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Post'),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -214,6 +289,7 @@ class _ForumScreenState extends State<ForumScreen> {
                       content: data['content'] ?? '',
                       authorEmail: data['authorEmail'] ?? 'Unknown',
                       authorId: data['authorId'] ?? '',
+                      imageUrl: data['imageUrl'],
                       timestamp: data['timestamp'] as Timestamp?,
                       likes: data['likes'] ?? 0,
                       comments: data['comments'] ?? 0,
@@ -244,6 +320,7 @@ class _PostWidget extends StatefulWidget {
   final String content;
   final String authorEmail;
   final String authorId;
+  final String? imageUrl;
   final Timestamp? timestamp;
   final int likes;
   final int comments;
@@ -256,6 +333,7 @@ class _PostWidget extends StatefulWidget {
     required this.content,
     required this.authorEmail,
     required this.authorId,
+    this.imageUrl,
     required this.timestamp,
     required this.likes,
     required this.comments,
@@ -352,9 +430,21 @@ class _PostWidgetState extends State<_PostWidget> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      widget.authorEmail.split('@')[0],
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(widget.authorId)
+                          .get(),
+                      builder: (context, snapshot) {
+                        final userData = snapshot.data?.data() as Map<String, dynamic>?;
+                        final displayName = userData?['username'] ?? userData?['fullName'] ?? widget.authorEmail.split('@')[0];
+                        
+                        return Text(
+                          displayName,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
                     ),
                     if (widget.timestamp != null)
                       Text(
@@ -409,6 +499,23 @@ class _PostWidgetState extends State<_PostWidget> {
           ),
           const SizedBox(height: 12),
           Text(widget.content),
+          if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: CachedNetworkImage(
+                imageUrl: widget.imageUrl!,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                errorWidget: (context, url, error) => Container(
+                  height: 200,
+                  color: Colors.grey[800],
+                  child: const Center(child: Icon(Icons.broken_image, size: 50)),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [

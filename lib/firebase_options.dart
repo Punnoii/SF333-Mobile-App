@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import '../config/app_config.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -43,13 +44,12 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC_QSKdQmOuks7jZA321wtdk8yKaJ50GOA',
-    appId: '1:899471675960:web:3b9092a7ec03aa62454ccd',
-    messagingSenderId: '899471675960',
-    projectId: 'paisabaiproject',
-    authDomain: 'paisabaiproject.firebaseapp.com',
-    storageBucket: 'paisabaiproject.firebasestorage.app',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: AppConfig.firebaseApiKeyWeb,
+    appId: AppConfig.firebaseAppIdWeb,
+    messagingSenderId: AppConfig.firebaseMessagingSenderId,
+    projectId: AppConfig.firebaseProjectId,
+    storageBucket: AppConfig.firebaseStorageBucket,
   );
 
   static const FirebaseOptions android = FirebaseOptions(
