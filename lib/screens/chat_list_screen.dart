@@ -3,7 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import 'chat_screen.dart';
+import '../services/theme_service.dart';
 
 class ChatListScreen extends StatefulWidget {
   static const String routeName = '/chatlist';
@@ -15,10 +17,23 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final Map<String, DocumentSnapshot> _userCache = {};
+
+  Future<DocumentSnapshot> _getUserData(String userId) async {
+    if (_userCache.containsKey(userId)) {
+      return _userCache[userId]!;
+    }
+    
+    final doc = await _firestore.collection('users').doc(userId).get();
+    _userCache[userId] = doc;
+    return doc;
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final themeService = Provider.of<ThemeService>(context);
+    final isDark = themeService.isDarkMode;
     
     if (user == null) {
       return const Scaffold(
@@ -29,13 +44,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.black,
+        backgroundColor: isDark ? Colors.black : Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.tealAccent),
+            icon: Icon(Icons.search, color: isDark ? Colors.tealAccent : Colors.teal),
             onPressed: () {
-              // TODO: Implement search functionality
+              _showNewChatDialog();
             },
           ),
         ],
@@ -61,11 +76,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[600]),
+                  Icon(Icons.chat_bubble_outline, size: 64, color: isDark ? Colors.grey[600] : Colors.grey[500]),
                   const SizedBox(height: 16),
-                  Text('No chats yet', style: TextStyle(fontSize: 18, color: Colors.grey[400])),
+                  Text('No chats yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.grey[700])),
                   const SizedBox(height: 8),
-                  Text('Tap + to start a new conversation', style: TextStyle(color: Colors.grey[600])),
+                  Text('Tap + to start a new conversation', style: TextStyle(color: isDark ? Colors.grey[600] : Colors.grey[600])),
                 ],
               ),
             );
@@ -85,23 +100,58 @@ class _ChatListScreenState extends State<ChatListScreen> {
               );
 
               return FutureBuilder<DocumentSnapshot>(
-                future: _firestore.collection('users').doc(otherUserId).get(),
+                key: ValueKey(otherUserId), // Add key to prevent rebuilds
+                future: _getUserData(otherUserId),
                 builder: (context, userSnapshot) {
+                  if (userSnapshot.connectionState == ConnectionState.waiting) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey[900] : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!, width: 0.5),
+                        boxShadow: isDark ? [] : [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        leading: CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Colors.grey,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        title: Text('Loading...', style: TextStyle(color: Colors.grey)),
+                      ),
+                    );
+                  }
+                  
                   final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
                   final otherUserName = userData?['username'] ?? userData?['fullName'] ?? userData?['email']?.split('@')[0] ?? 'Unknown';
 
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.grey[900],
+                      color: isDark ? Colors.grey[900] : Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[800]!, width: 0.5),
+                      border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!, width: 0.5),
+                      boxShadow: isDark ? [] : [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       leading: CircleAvatar(
                         radius: 24,
-                        backgroundColor: Colors.grey[800],
+                        backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
                         child: userData?['profileImageUrl'] != null
                             ? ClipOval(
                                 child: CachedNetworkImage(
@@ -117,7 +167,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       ),
                       title: Text(
                         otherUserName,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600, 
+                          fontSize: 16,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
                       ),
                       subtitle: Padding(
                         padding: const EdgeInsets.only(top: 4),
@@ -125,7 +179,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           data['lastMessage'] ?? 'No messages yet',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                          style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 14),
                         ),
                       ),
                       trailing: Column(
@@ -137,10 +191,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                               DateFormat('MMM d').format(
                                 (data['lastMessageTime'] as Timestamp).toDate(),
                               ),
-                              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                              style: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[600], fontSize: 12),
                             ),
                           const SizedBox(height: 4),
-                          Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
+                          Icon(Icons.chevron_right, color: isDark ? Colors.grey[600] : Colors.grey[500], size: 20),
                         ],
                       ),
                       onTap: () {
@@ -167,8 +221,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         onPressed: () {
           _showNewChatDialog();
         },
-        backgroundColor: Colors.tealAccent,
-        foregroundColor: Colors.black,
+        backgroundColor: isDark ? Colors.tealAccent : Colors.teal,
+        foregroundColor: isDark ? Colors.black : Colors.white,
         child: const Icon(Icons.add),
       ),
     );
@@ -177,19 +231,37 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void _showNewChatDialog() {
     final emailController = TextEditingController();
     
+    final themeService = Provider.of<ThemeService>(context, listen: false);
+    final isDark = themeService.isDarkMode;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Start New Chat'),
+        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+        title: Text(
+          'Start New Chat',
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: emailController,
-              decoration: const InputDecoration(
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
                 hintText: 'Enter email or full name',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.tealAccent : Colors.teal),
+                ),
                 helperText: 'You can search by email or full name',
+                helperStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[600]),
               ),
             ),
           ],
@@ -197,14 +269,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+            ),
           ),
           TextButton(
             onPressed: () async {
               await _startNewChat(emailController.text.trim());
               Navigator.pop(context);
             },
-            child: const Text('Start Chat'),
+            child: Text(
+              'Start Chat',
+              style: TextStyle(color: isDark ? Colors.tealAccent : Colors.teal),
+            ),
           ),
         ],
       ),

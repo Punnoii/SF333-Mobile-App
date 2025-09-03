@@ -4,10 +4,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import 'comment_screen.dart';
 import 'user_profile_screen.dart';
 import '../services/cloudinary_service.dart';
+import '../services/theme_service.dart';
 
 class ForumScreen extends StatefulWidget {
   static const String routeName = '/forum';
@@ -127,6 +129,9 @@ class _ForumScreenState extends State<ForumScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = Provider.of<ThemeService>(context);
+    final isDark = themeService.isDarkMode;
+    
     return Scaffold(
       appBar: AppBar(
         title: ShaderMask(
@@ -144,7 +149,7 @@ class _ForumScreenState extends State<ForumScreen> {
             ),
           ),
         ),
-        backgroundColor: Colors.black.withOpacity(0.9),
+        backgroundColor: isDark ? Colors.black.withOpacity(0.9) : Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false,
         flexibleSpace: Container(
@@ -152,9 +157,12 @@ class _ForumScreenState extends State<ForumScreen> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
+              colors: isDark ? [
                 Colors.black.withOpacity(0.9),
                 Colors.grey[900]!.withOpacity(0.9),
+              ] : [
+                Colors.white,
+                Colors.grey[50]!,
               ],
             ),
           ),
@@ -164,27 +172,30 @@ class _ForumScreenState extends State<ForumScreen> {
         children: [
           // Post creation area with enhanced styling
           Container(
+            margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
+                colors: isDark ? [
                   const Color(0xFF2B2B2B),
                   Colors.grey[800]!,
+                ] : [
+                  Colors.white,
+                  Colors.grey[100]!,
                 ],
               ),
-              border: Border(
-                bottom: BorderSide(
-                  color: Colors.tealAccent.withOpacity(0.2),
-                  width: 1,
-                ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.tealAccent.withOpacity(0.2),
+                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
+                  color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -327,11 +338,11 @@ class _ForumScreenState extends State<ForumScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.forum_outlined, size: 64, color: Colors.grey[600]),
+                        Icon(Icons.forum_outlined, size: 64, color: isDark ? Colors.grey[600] : Colors.grey[500]),
                         const SizedBox(height: 16),
-                        Text('No posts yet', style: TextStyle(fontSize: 18, color: Colors.grey[400])),
+                        Text('No posts yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.grey[700])),
                         const SizedBox(height: 8),
-                        Text('Be the first to share something!', style: TextStyle(color: Colors.grey[600])),
+                        Text('Be the first to share something!', style: TextStyle(color: isDark ? Colors.grey[600] : Colors.grey[600])),
                       ],
                     ),
                   );
@@ -344,28 +355,27 @@ class _ForumScreenState extends State<ForumScreen> {
                     final data = post.data() as Map<String, dynamic>;
                     final postId = post.id;
 
-                    return AnimatedContainer(
-                      duration: Duration(milliseconds: 300 + (index * 50)),
-                      curve: Curves.easeOutBack,
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: _PostWidget(
                         postId: postId,
                         content: data['content'] ?? '',
-                      authorEmail: data['authorEmail'] ?? 'Unknown',
-                      authorId: data['authorId'] ?? '',
-                      imageUrl: data['imageUrl'],
-                      timestamp: data['timestamp'] as Timestamp?,
-                      likes: data['likes'] ?? 0,
-                      comments: data['comments'] ?? 0,
-                      onLike: (isLiked) => _toggleLike(postId, isLiked, data['likes'] ?? 0),
-                      onComment: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CommentScreen(postId: postId),
-                          ),
-                        );
-                      },
-                      onDelete: () => _deletePost(postId),
+                        authorEmail: data['authorEmail'] ?? 'Unknown',
+                        authorId: data['authorId'] ?? '',
+                        imageUrl: data['imageUrl'],
+                        timestamp: data['timestamp'] as Timestamp?,
+                        likes: data['likes'] ?? 0,
+                        comments: data['comments'] ?? 0,
+                        onLike: (isLiked) => _toggleLike(postId, isLiked, data['likes'] ?? 0),
+                        onComment: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CommentScreen(postId: postId),
+                            ),
+                          );
+                        },
+                        onDelete: () => _deletePost(postId),
                       ),
                     );
                   },
@@ -476,10 +486,12 @@ class _PostWidgetState extends State<_PostWidget> {
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-          Row(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
             children: [
               FutureBuilder<DocumentSnapshot>(
                 future: FirebaseFirestore.instance
@@ -632,7 +644,8 @@ class _PostWidgetState extends State<_PostWidget> {
               const Spacer(),
             ],
           ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

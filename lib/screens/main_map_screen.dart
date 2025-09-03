@@ -3,12 +3,14 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'login_screen.dart';
 import 'forum_screen.dart';
 import 'chat_list_screen.dart';
 import 'profile_screen.dart';
 import 'incident_report_screen.dart';
 import 'incident_detail_screen.dart';
+import '../services/theme_service.dart';
 
 class MainMapScreen extends StatefulWidget {
   static const String routeName = '/main';
@@ -72,34 +74,49 @@ class _MainMapScreenState extends State<MainMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Consumer<ThemeService>(
+      builder: (context, themeService, child) {
+        final isDark = themeService.isDarkMode;
+        
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            // Handle back button - stay on main screen
+          },
+          child: Scaffold(
       appBar: AppBar(
         title: ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [Colors.tealAccent, Colors.cyan],
+          shaderCallback: (bounds) => LinearGradient(
+            colors: isDark 
+              ? [Colors.tealAccent, Colors.cyan]
+              : [Colors.teal, Colors.teal.shade700],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ).createShader(bounds),
-          child: const Text(
+          child: Text(
             'PAISABAI',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: isDark ? Colors.white : Colors.black,
             ),
           ),
         ),
         centerTitle: false,
-        backgroundColor: Colors.black.withOpacity(0.9),
-        elevation: 0,
+        backgroundColor: isDark ? Colors.black.withOpacity(0.9) : Colors.white,
+        elevation: isDark ? 0 : 1,
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
+              colors: isDark ? [
                 Colors.black.withOpacity(0.9),
                 Colors.grey[900]!.withOpacity(0.9),
+              ] : [
+                Colors.white,
+                Colors.grey[50]!,
               ],
             ),
           ),
@@ -108,14 +125,16 @@ class _MainMapScreenState extends State<MainMapScreen> {
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Colors.tealAccent, Colors.cyan],
+              gradient: LinearGradient(
+                colors: isDark 
+                  ? [Colors.tealAccent, Colors.cyan]
+                  : [Colors.teal, Colors.teal.shade600],
               ),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Builder(
               builder: (ctx) => IconButton(
-                icon: const Icon(Icons.menu, color: Colors.black),
+                icon: Icon(Icons.menu, color: isDark ? Colors.black : Colors.white),
                 onPressed: () => Scaffold.of(ctx).openEndDrawer(),
               ),
             ),
@@ -125,8 +144,25 @@ class _MainMapScreenState extends State<MainMapScreen> {
       endDrawer: Drawer(
         child: SafeArea(
           child: ListView(
-            children: const [
-              ListTile(leading: Icon(Icons.info_outline), title: Text('About')),
+            children: [
+              Consumer<ThemeService>(
+                builder: (context, themeService, child) {
+                  return ListTile(
+                    leading: Icon(
+                      themeService.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                    ),
+                    title: Text(themeService.isDarkMode ? 'Light Mode' : 'Dark Mode'),
+                    onTap: () {
+                      themeService.toggleTheme();
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+              const ListTile(
+                leading: Icon(Icons.info_outline), 
+                title: Text('About')
+              ),
             ],
           ),
         ),
@@ -145,14 +181,19 @@ class _MainMapScreenState extends State<MainMapScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
+            colors: isDark ? [
               Colors.grey[900]!.withOpacity(0.95),
               Colors.black.withOpacity(0.98),
+            ] : [
+              Colors.white.withOpacity(0.95),
+              Colors.grey[100]!.withOpacity(0.98),
             ],
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.tealAccent.withOpacity(0.1),
+              color: isDark 
+                ? Colors.tealAccent.withOpacity(0.1)
+                : Colors.teal.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -163,8 +204,8 @@ class _MainMapScreenState extends State<MainMapScreen> {
           currentIndex: currentIndex,
           backgroundColor: Colors.transparent,
           elevation: 0,
-          selectedItemColor: Colors.tealAccent,
-          unselectedItemColor: Colors.grey[400],
+          selectedItemColor: isDark ? Colors.tealAccent : Colors.teal,
+          unselectedItemColor: isDark ? Colors.grey : Colors.grey[600],
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
           onTap: (i) async {
             if ((i == 0 || i == 3) && FirebaseAuth.instance.currentUser == null) {
@@ -184,7 +225,9 @@ class _MainMapScreenState extends State<MainMapScreen> {
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: currentIndex == 0 ? Colors.tealAccent.withOpacity(0.2) : Colors.transparent,
+                      color: currentIndex == 0 
+                        ? (isDark ? Colors.tealAccent.withOpacity(0.2) : Colors.teal.withOpacity(0.2))
+                        : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.message_outlined),
@@ -232,7 +275,9 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: currentIndex == 1 ? Colors.tealAccent.withOpacity(0.2) : Colors.transparent,
+                  color: currentIndex == 1 
+                    ? (isDark ? Colors.tealAccent.withOpacity(0.2) : Colors.teal.withOpacity(0.2))
+                    : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.home_outlined),
@@ -244,7 +289,9 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: currentIndex == 2 ? Colors.tealAccent.withOpacity(0.2) : Colors.transparent,
+                  color: currentIndex == 2 
+                    ? (isDark ? Colors.tealAccent.withOpacity(0.2) : Colors.teal.withOpacity(0.2))
+                    : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.forum_outlined),
@@ -256,7 +303,9 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: currentIndex == 3 ? Colors.tealAccent.withOpacity(0.2) : Colors.transparent,
+                  color: currentIndex == 3 
+                    ? (isDark ? Colors.tealAccent.withOpacity(0.2) : Colors.teal.withOpacity(0.2))
+                    : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.person_outline),
@@ -266,10 +315,16 @@ class _MainMapScreenState extends State<MainMapScreen> {
           ],
         ),
       ),
+    ),
+          );
+      },
     );
   }
 
   Widget _buildMap() {
+    final themeService = Provider.of<ThemeService>(context);
+    final isDark = themeService.isDarkMode;
+    
     return Stack(
       children: [
         FlutterMap(
@@ -393,24 +448,33 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
+                  colors: isDark ? [
                     const Color(0xFF2B2B2B),
                     Colors.grey[800]!,
+                  ] : [
+                    Colors.white,
+                    Colors.grey[50]!,
                   ],
                 ),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: Colors.tealAccent.withOpacity(0.3),
+                  color: isDark 
+                    ? Colors.tealAccent.withOpacity(0.3)
+                    : Colors.teal.withOpacity(0.3),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.4),
+                    color: isDark 
+                      ? Colors.black.withOpacity(0.4)
+                      : Colors.grey.withOpacity(0.2),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
                   BoxShadow(
-                    color: Colors.tealAccent.withOpacity(0.1),
+                    color: isDark 
+                      ? Colors.tealAccent.withOpacity(0.1)
+                      : Colors.teal.withOpacity(0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -422,9 +486,13 @@ class _MainMapScreenState extends State<MainMapScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Location Selected',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close),
@@ -441,7 +509,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                   Text(
                     'Lat: ${_selectedLocation!.latitude.toStringAsFixed(4)}, '
                     'Lng: ${_selectedLocation!.longitude.toStringAsFixed(4)}',
-                    style: const TextStyle(color: Colors.grey),
+                    style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600]),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -639,6 +707,9 @@ class _EnhancedZoomButtonState extends State<_EnhancedZoomButton>
 
   @override
   Widget build(BuildContext context) {
+    final themeService = Provider.of<ThemeService>(context);
+    final isDark = themeService.isDarkMode;
+    
     return AnimatedBuilder(
       animation: _scaleAnimation,
       builder: (context, child) {
@@ -649,24 +720,33 @@ class _EnhancedZoomButtonState extends State<_EnhancedZoomButton>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
+                colors: isDark ? [
                   Colors.black.withOpacity(0.8),
                   Colors.grey[800]!.withOpacity(0.9),
+                ] : [
+                  Colors.white.withOpacity(0.9),
+                  Colors.grey[100]!.withOpacity(0.9),
                 ],
               ),
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.tealAccent.withOpacity(0.3),
+                color: isDark 
+                  ? Colors.tealAccent.withOpacity(0.3)
+                  : Colors.teal.withOpacity(0.3),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.4),
+                  color: isDark 
+                    ? Colors.black.withOpacity(0.4)
+                    : Colors.grey.withOpacity(0.2),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
                 BoxShadow(
-                  color: Colors.tealAccent.withOpacity(0.1),
+                  color: isDark 
+                    ? Colors.tealAccent.withOpacity(0.1)
+                    : Colors.teal.withOpacity(0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 1),
                 ),
@@ -685,7 +765,7 @@ class _EnhancedZoomButtonState extends State<_EnhancedZoomButton>
                   padding: const EdgeInsets.all(12),
                   child: Icon(
                     widget.icon,
-                    color: Colors.tealAccent,
+                    color: isDark ? Colors.tealAccent : Colors.teal,
                     size: 24,
                   ),
                 ),
