@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RegisterScreen extends StatefulWidget {
   static const String routeName = '/register';
@@ -100,15 +101,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           onPressed: agree
                               ? () async {
+                                  if (passwordController.text != confirmPasswordController.text) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Passwords do not match')),
+                                    );
+                                    return;
+                                  }
+                                  
                                   try {
-                                    await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                                    final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
                                       email: emailController.text.trim(),
                                       password: passwordController.text,
                                     );
+                                    
+                                    // Create user profile in Firestore
+                                    await FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(credential.user!.uid)
+                                        .set({
+                                      'username': usernameController.text.trim(),
+                                      'email': emailController.text.trim(),
+                                      'phoneNumber': phoneController.text.trim(),
+                                      'disabilityType': disabilityController.text.trim(),
+                                      'createdAt': FieldValue.serverTimestamp(),
+                                      'profileImageUrl': '', // Local path will be set when user uploads image
+                                    });
+                                    
                                     if (!mounted) return;
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Registered. Please login.')),
+                                      const SnackBar(content: Text('Registered successfully. Please login.')),
                                     );
                                   } on FirebaseAuthException catch (e) {
                                     ScaffoldMessenger.of(context).showSnackBar(

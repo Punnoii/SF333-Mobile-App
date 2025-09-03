@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'register_screen.dart';
 import 'change_password_screen.dart';
-import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   static const String routeName = '/login';
@@ -114,10 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               password: passwordController.text,
                             );
                             if (!mounted) return;
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => const HomeScreen()),
-                            );
+                            Navigator.pushReplacementNamed(context, '/');
                           } on FirebaseAuthException catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(e.message ?? 'Login failed')),
