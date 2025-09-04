@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_map_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/change_password_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'services/theme_service.dart';
@@ -38,6 +39,7 @@ class MyApp extends StatelessWidget {
             routes: {
               '/main': (_) => const MainMapScreen(),
               '/login': (_) => const LoginScreen(),
+              '/register': (_) => const RegisterScreen(),
               '/change-password': (_) => const ChangePasswordScreen(),
               '/edit-profile': (_) => const EditProfileScreen(),
             },
