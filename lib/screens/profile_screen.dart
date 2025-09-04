@@ -127,10 +127,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 return Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.tealAccent, width: 3),
+                    border: Border.all(color: isDark ? Colors.tealAccent : Colors.teal, width: 3),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.tealAccent.withOpacity(0.3),
+                        color: isDark ? Colors.tealAccent.withOpacity(0.3) : Colors.teal.withOpacity(0.2),
                         blurRadius: 12,
                         spreadRadius: 2,
                       ),
@@ -138,7 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: CircleAvatar(
                     radius: 60,
-                    backgroundColor: Colors.grey[800],
+                    backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
                     child: profileImageUrl != null && profileImageUrl.toString().isNotEmpty
                         ? ClipOval(
                             child: CachedNetworkImage(
@@ -174,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 8),
             Text(
               user.email ?? 'No email',
-              style: TextStyle(fontSize: 16, color: Colors.grey[400]),
+              style: TextStyle(fontSize: 16, color: isDark ? Colors.grey[400] : Colors.grey[600]),
             ),
             const SizedBox(height: 32),
             
@@ -183,12 +183,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 16),
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.grey[900],
+                color: isDark ? Colors.grey[900] : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey[800]!, width: 0.5),
+                border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!, width: 0.5),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -267,9 +267,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.grey[900],
+                    color: isDark ? Colors.grey[900] : Colors.grey[100],
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[800]!, width: 0.5),
+                    border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!, width: 0.5),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,9 +278,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           Icon(Icons.accessibility_new, color: Colors.tealAccent, size: 20),
                           const SizedBox(width: 8),
-                          const Text(
+                          Text(
                             'Accessibility Information',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
                           ),
                         ],
                       ),
@@ -289,12 +289,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.grey[850],
+                          color: isDark ? Colors.grey[850] : Colors.grey[200],
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           disabilityType,
-                          style: const TextStyle(fontSize: 16),
+                          style: TextStyle(fontSize: 16, color: isDark ? Colors.white : Colors.black87),
                         ),
                       ),
                     ],

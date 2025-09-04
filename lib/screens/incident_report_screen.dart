@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import '../services/cloudinary_service.dart';
+import '../services/theme_service.dart';
 
 class IncidentReportScreen extends StatefulWidget {
   final double latitude;
@@ -105,10 +107,13 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = Provider.of<ThemeService>(context);
+    final isDark = themeService.isDarkMode;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Report Incident'),
-        backgroundColor: Colors.black,
+        backgroundColor: isDark ? Colors.black : Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -119,7 +124,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey[900],
+                color: isDark ? Colors.grey[900] : Colors.grey[100],
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -129,7 +134,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                   Expanded(
                     child: Text(
                       'Lat: ${widget.latitude.toStringAsFixed(4)}, Lng: ${widget.longitude.toStringAsFixed(4)}',
-                      style: const TextStyle(color: Colors.grey),
+                      style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600]),
                     ),
                   ),
                 ],
@@ -138,13 +143,18 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
             const SizedBox(height: 20),
             
             // Category selection
-            const Text('Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _selectedCategory,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               items: _categories.map((category) {
                 return DropdownMenuItem(
@@ -161,33 +171,53 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
             const SizedBox(height: 20),
             
             // Title
-            const Text('Title', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Title', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
             const SizedBox(height: 8),
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
                 hintText: 'Brief description of the incident',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.tealAccent : Colors.teal),
+                ),
               ),
               maxLines: 1,
             ),
             const SizedBox(height: 20),
             
             // Description
-            const Text('Description', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Description', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
             const SizedBox(height: 8),
             TextField(
               controller: _descriptionController,
-              decoration: const InputDecoration(
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
                 hintText: 'Detailed description (optional)',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.tealAccent : Colors.teal),
+                ),
               ),
               maxLines: 3,
             ),
             const SizedBox(height: 20),
             
             // Image upload
-            const Text('Photo (Optional)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Photo (Optional)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
             const SizedBox(height: 8),
             GestureDetector(
               onTap: _pickImage,
@@ -195,7 +225,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                 height: 150,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
+                  border: Border.all(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: _selectedImage != null
@@ -206,12 +236,12 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                           fit: BoxFit.cover,
                         ),
                       )
-                    : const Column(
+                    : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_a_photo, size: 50, color: Colors.grey),
-                          SizedBox(height: 8),
-                          Text('Tap to add photo', style: TextStyle(color: Colors.grey)),
+                          Icon(Icons.add_a_photo, size: 50, color: isDark ? Colors.grey : Colors.grey[600]),
+                          const SizedBox(height: 8),
+                          Text('Tap to add photo', style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600])),
                         ],
                       ),
               ),

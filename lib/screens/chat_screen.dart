@@ -216,7 +216,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     padding: const EdgeInsets.all(2),
                     child: CircleAvatar(
                       radius: 22,
-                      backgroundColor: Colors.grey[900],
+                      backgroundColor: isDark ? Colors.grey[900] : Colors.grey[300],
                       child: profileImageUrl != null
                           ? ClipOval(
                               child: CachedNetworkImage(
@@ -285,10 +285,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
+            colors: isDark ? [
               const Color(0xFF0A0A0A),
               const Color(0xFF1A1A1A).withOpacity(0.8),
               const Color(0xFF0A0A0A),
+            ] : [
+              Colors.grey[50]!,
+              Colors.grey[100]!.withOpacity(0.8),
+              Colors.grey[50]!,
             ],
           ),
         ),
@@ -419,7 +423,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                               barrierColor: Colors.black.withOpacity(0.7),
                               builder: (BuildContext context) {
                                 return AlertDialog(
-                                  backgroundColor: const Color(0xFF2B2B2B),
+                                  backgroundColor: isDark ? const Color(0xFF2B2B2B) : Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(20),
                                     side: BorderSide(
@@ -523,7 +527,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                         
                                         return CircleAvatar(
                                           radius: 18,
-                                          backgroundColor: Colors.grey[800],
+                                          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
                                           child: profileImageUrl != null
                                               ? ClipOval(
                                                   child: CachedNetworkImage(
@@ -703,7 +707,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                         
                                         return CircleAvatar(
                                           radius: 18,
-                                          backgroundColor: Colors.grey[800],
+                                          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
                                           child: profileImageUrl != null && profileImageUrl.toString().isNotEmpty
                                               ? ClipOval(
                                                   child: CachedNetworkImage(
@@ -747,9 +751,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
+                  colors: isDark ? [
                     const Color(0xFF1A1A1A),
                     const Color(0xFF0A0A0A),
+                  ] : [
+                    Colors.white,
+                    Colors.grey[100]!,
                   ],
                 ),
                 border: Border(
@@ -760,7 +767,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
+                    color: isDark ? Colors.black.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
                     blurRadius: 20,
                     offset: const Offset(0, -5),
                   ),
@@ -850,9 +857,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         child: Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [
+                              colors: isDark ? [
                                 const Color(0xFF2A2A2A),
                                 const Color(0xFF1E1E1E),
+                              ] : [
+                                Colors.white,
+                                Colors.grey[100]!,
                               ],
                             ),
                             borderRadius: BorderRadius.circular(30),
@@ -862,7 +872,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
+                                color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -870,18 +880,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           ),
                           child: TextField(
                             controller: _messageController,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black87,
                               fontSize: 16,
                             ),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: 'Type a message...',
                               hintStyle: TextStyle(
-                                color: Colors.grey,
+                                color: isDark ? Colors.grey : Colors.grey[600],
                                 fontSize: 16,
                               ),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                             ),
                             maxLines: null,
                             onSubmitted: (_) => _sendMessage(),

@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../services/theme_service.dart';
 
 class IncidentDetailScreen extends StatelessWidget {
   final Map<String, dynamic> incident;
@@ -42,11 +44,13 @@ class IncidentDetailScreen extends StatelessWidget {
     final imageUrl = incident['imageUrl'] as String?;
     final currentUser = FirebaseAuth.instance.currentUser;
     final isOwner = currentUser?.uid == incident['reportedBy'];
+    final themeService = Provider.of<ThemeService>(context);
+    final isDark = themeService.isDarkMode;
     
     return Scaffold(
       appBar: AppBar(
         title: Text(incident['title'] ?? 'Incident Details'),
-        backgroundColor: Colors.black,
+        backgroundColor: isDark ? Colors.black : Colors.white,
         actions: [
           if (isOwner)
             IconButton(
@@ -55,12 +59,22 @@ class IncidentDetailScreen extends StatelessWidget {
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Delete Incident'),
-                    content: const Text('Are you sure you want to delete this incident? This action cannot be undone.'),
+                    backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+                    title: Text(
+                      'Delete Incident',
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    ),
+                    content: Text(
+                      'Are you sure you want to delete this incident? This action cannot be undone.',
+                      style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700]),
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                        ),
                       ),
                       TextButton(
                         onPressed: () {
@@ -102,9 +116,10 @@ class IncidentDetailScreen extends StatelessWidget {
             // Title
             Text(
               incident['title'] ?? 'No Title',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
               ),
             ),
             const SizedBox(height: 8),
@@ -116,7 +131,7 @@ class IncidentDetailScreen extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   'Lat: ${incident['latitude']?.toStringAsFixed(4)}, Lng: ${incident['longitude']?.toStringAsFixed(4)}',
-                  style: const TextStyle(color: Colors.grey),
+                  style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600]),
                 ),
               ],
             ),
@@ -136,7 +151,7 @@ class IncidentDetailScreen extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 12,
-                      backgroundColor: Colors.grey[800],
+                      backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
                       child: userData?['profileImageUrl'] != null
                           ? ClipOval(
                               child: CachedNetworkImage(
@@ -153,13 +168,13 @@ class IncidentDetailScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       'Reported by $reporterName',
-                      style: const TextStyle(color: Colors.grey),
+                      style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600]),
                     ),
                     if (reportedAt != null) ...[
-                      const Text(' • ', style: TextStyle(color: Colors.grey)),
+                      Text(' • ', style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600])),
                       Text(
                         DateFormat('MMM d, yyyy HH:mm').format(reportedAt.toDate()),
-                        style: const TextStyle(color: Colors.grey),
+                        style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600]),
                       ),
                     ],
                   ],
@@ -180,7 +195,7 @@ class IncidentDetailScreen extends StatelessWidget {
                   placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                   errorWidget: (context, url, error) => Container(
                     height: 200,
-                    color: Colors.grey[800],
+                    color: isDark ? Colors.grey[800] : Colors.grey[200],
                     child: const Center(child: Icon(Icons.broken_image)),
                   ),
                 ),
@@ -190,14 +205,22 @@ class IncidentDetailScreen extends StatelessWidget {
             
             // Description
             if (incident['description'] != null && incident['description'].toString().isNotEmpty) ...[
-              const Text(
+              Text(
                 'Description',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 incident['description'],
-                style: const TextStyle(fontSize: 16, height: 1.5),
+                style: TextStyle(
+                  fontSize: 16, 
+                  height: 1.5,
+                  color: isDark ? Colors.grey[300] : Colors.grey[700],
+                ),
               ),
               const SizedBox(height: 20),
             ],
@@ -205,7 +228,7 @@ class IncidentDetailScreen extends StatelessWidget {
             // Status
             Row(
               children: [
-                const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(

@@ -12,16 +12,42 @@ class ThemeService extends ChangeNotifier {
   }
 
   Future<void> _loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-    _isDarkMode = prefs.getBool(_themeKey) ?? true; // Default to dark
-    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isDarkMode = prefs.getBool(_themeKey) ?? true; // Default to dark
+      notifyListeners();
+    } catch (e) {
+      // If loading fails, keep default value and notify
+      notifyListeners();
+    }
   }
 
+  bool _isToggling = false;
+
   Future<void> toggleTheme() async {
-    _isDarkMode = !_isDarkMode;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_themeKey, _isDarkMode);
-    notifyListeners();
+    // Prevent rapid toggling that can cause race conditions
+    if (_isToggling) return;
+    
+    _isToggling = true;
+    
+    try {
+      _isDarkMode = !_isDarkMode;
+      notifyListeners();
+      
+      // Add small delay to prevent UI flicker
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_themeKey, _isDarkMode);
+    } catch (e) {
+      // Revert on error
+      _isDarkMode = !_isDarkMode;
+      notifyListeners();
+    } finally {
+      // Add delay before allowing next toggle
+      await Future.delayed(const Duration(milliseconds: 200));
+      _isToggling = false;
+    }
   }
 
   ThemeData get darkTheme => ThemeData(

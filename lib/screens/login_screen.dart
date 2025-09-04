@@ -113,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               password: passwordController.text,
                             );
                             if (!mounted) return;
-                            Navigator.pushReplacementNamed(context, '/');
+                            Navigator.pushReplacementNamed(context, '/main');
                           } on FirebaseAuthException catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(e.message ?? 'Login failed')),

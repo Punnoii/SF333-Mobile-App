@@ -86,19 +86,24 @@ class _ForumScreenState extends State<ForumScreen> {
       final postRef = _firestore.collection('posts').doc(postId);
       final likesRef = postRef.collection('likes').doc(user.uid);
 
-      // Check if user already liked this post
-      final likeDoc = await likesRef.get();
-      final hasLiked = likeDoc.exists;
+      // Use Firestore transaction to prevent race conditions
+      await _firestore.runTransaction((transaction) async {
+        final likeDoc = await transaction.get(likesRef);
+        final postDoc = await transaction.get(postRef);
+        
+        final hasLiked = likeDoc.exists;
+        final currentLikeCount = postDoc.data()?['likes'] ?? 0;
 
-      if (hasLiked) {
-        // Unlike
-        await likesRef.delete();
-        await postRef.update({'likes': FieldValue.increment(-1)});
-      } else {
-        // Like
-        await likesRef.set({'timestamp': FieldValue.serverTimestamp()});
-        await postRef.update({'likes': FieldValue.increment(1)});
-      }
+        if (hasLiked) {
+          // Unlike
+          transaction.delete(likesRef);
+          transaction.update(postRef, {'likes': currentLikeCount - 1});
+        } else {
+          // Like
+          transaction.set(likesRef, {'timestamp': FieldValue.serverTimestamp()});
+          transaction.update(postRef, {'likes': currentLikeCount + 1});
+        }
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -228,8 +233,10 @@ class _ForumScreenState extends State<ForumScreen> {
                     children: [
                       TextField(
                         controller: _postController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                        decoration: InputDecoration(
                           hintText: 'What\'s on your mind?',
+                          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
                           border: InputBorder.none,
                         ),
                         maxLines: 3,
@@ -422,6 +429,7 @@ class _PostWidget extends StatefulWidget {
 
 class _PostWidgetState extends State<_PostWidget> {
   bool isLiked = false;
+  bool _isLikeInProgress = false;
 
   @override
   void initState() {
@@ -453,6 +461,9 @@ class _PostWidgetState extends State<_PostWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = Provider.of<ThemeService>(context);
+    final isDark = themeService.isDarkMode;
+    
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -468,9 +479,12 @@ class _PostWidgetState extends State<_PostWidget> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
+              colors: isDark ? [
                 const Color(0xFF2B2B2B),
                 Colors.grey[800]!.withOpacity(0.9),
+              ] : [
+                Colors.white,
+                Colors.grey[50]!,
               ],
             ),
             borderRadius: BorderRadius.circular(16),
@@ -480,7 +494,7 @@ class _PostWidgetState extends State<_PostWidget> {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
@@ -543,7 +557,7 @@ class _PostWidgetState extends State<_PostWidget> {
                         
                         return Text(
                           displayName,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
                           overflow: TextOverflow.ellipsis,
                         );
                       },
@@ -551,7 +565,7 @@ class _PostWidgetState extends State<_PostWidget> {
                     if (widget.timestamp != null)
                       Text(
                         DateFormat('MMM d, y • h:mm a').format(widget.timestamp!.toDate()),
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600], fontSize: 12),
                       ),
                   ],
                 ),
@@ -559,18 +573,19 @@ class _PostWidgetState extends State<_PostWidget> {
               // Three-dot menu for post owner
               if (widget.authorId == FirebaseAuth.instance.currentUser?.uid)
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Colors.grey),
+                  icon: Icon(Icons.more_vert, color: isDark ? Colors.grey : Colors.grey[600]),
                   onSelected: (value) {
                     if (value == 'delete') {
                       showDialog(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: const Text('Delete Post'),
-                          content: const Text('Are you sure you want to delete this post?'),
+                          backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+                          title: Text('Delete Post', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                          content: Text('Are you sure you want to delete this post?', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700])),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel'),
+                              child: Text('Cancel', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700])),
                             ),
                             TextButton(
                               onPressed: () {
@@ -600,7 +615,7 @@ class _PostWidgetState extends State<_PostWidget> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(widget.content),
+          Text(widget.content, style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
           if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) ...[
             const SizedBox(height: 12),
             ClipRRect(
@@ -612,8 +627,8 @@ class _PostWidgetState extends State<_PostWidget> {
                 placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                 errorWidget: (context, url, error) => Container(
                   height: 200,
-                  color: Colors.grey[800],
-                  child: const Center(child: Icon(Icons.broken_image, size: 50)),
+                  color: isDark ? Colors.grey[800] : Colors.grey[300],
+                  child: Icon(Icons.broken_image, size: 50, color: isDark ? Colors.grey[600] : Colors.grey[500]),
                 ),
               ),
             ),
@@ -629,18 +644,40 @@ class _PostWidgetState extends State<_PostWidget> {
                     isLiked ? Icons.favorite : Icons.favorite_border,
                     color: isLiked ? Colors.red : Colors.grey,
                   ),
-                  onPressed: () {
-                    widget.onLike(!isLiked);
+                  onPressed: _isLikeInProgress ? null : () async {
+                    if (_isLikeInProgress) return;
+                    
+                    final newLikeState = !isLiked;
+                    
+                    setState(() {
+                      _isLikeInProgress = true;
+                      isLiked = newLikeState; // Optimistic update
+                    });
+                    
+                    try {
+                      await widget.onLike(newLikeState);
+                    } catch (e) {
+                      // Revert optimistic update on error
+                      setState(() {
+                        isLiked = !newLikeState;
+                      });
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _isLikeInProgress = false;
+                        });
+                      }
+                    }
                   },
                 ),
               ),
-              Text('${widget.likes}'),
+              Text('${widget.likes}', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               const SizedBox(width: 16),
               IconButton(
-                icon: const Icon(Icons.comment_outlined),
+                icon: Icon(Icons.comment_outlined, color: isDark ? Colors.grey : Colors.grey[600]),
                 onPressed: widget.onComment,
               ),
-              Text('${widget.comments}'),
+              Text('${widget.comments}', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
               const Spacer(),
             ],
           ),
