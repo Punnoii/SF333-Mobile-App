@@ -81,9 +81,12 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
         'latitude': widget.latitude,
         'longitude': widget.longitude,
         'imageUrl': imageUrl,
-        'reportedBy': user.uid,
+        'reporterId': user.uid, // Changed from 'reportedBy' to 'reporterId'
+        'reportedBy': user.uid, // Keep both for compatibility
         'reportedAt': FieldValue.serverTimestamp(),
-        'status': 'active',
+        'status': 'pending',
+        'reporterEmail': user.email,
+        'timestamp': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {

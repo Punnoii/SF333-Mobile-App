@@ -32,14 +32,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Positioned(
+                top: 16,
+                left: 16,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
             Center(
               child: SingleChildScrollView(
                 child: Container(
@@ -157,8 +163,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: const Text('Already have an account? Login'),
                 ),
               ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );

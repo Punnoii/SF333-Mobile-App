@@ -236,7 +236,7 @@ class _ForumScreenState extends State<ForumScreen> {
                         style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                         decoration: InputDecoration(
                           hintText: 'What\'s on your mind?',
-                          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54),
                           border: InputBorder.none,
                         ),
                         maxLines: 3,
@@ -345,11 +345,11 @@ class _ForumScreenState extends State<ForumScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.forum_outlined, size: 64, color: isDark ? Colors.grey[600] : Colors.grey[500]),
+                        Icon(Icons.forum_outlined, size: 64, color: isDark ? Colors.grey[600] : Colors.black54),
                         const SizedBox(height: 16),
-                        Text('No posts yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.grey[700])),
+                        Text('No posts yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.black87)),
                         const SizedBox(height: 8),
-                        Text('Be the first to share something!', style: TextStyle(color: isDark ? Colors.grey[600] : Colors.grey[600])),
+                        Text('Be the first to share something!', style: TextStyle(color: isDark ? Colors.grey[600] : Colors.black54)),
                       ],
                     ),
                   );
