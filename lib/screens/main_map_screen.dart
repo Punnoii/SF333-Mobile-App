@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,14 +7,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import 'dart:math';
 import '../services/theme_service.dart';
 import '../services/location_service.dart';
 import 'chat_list_screen.dart';
 import 'profile_screen.dart';
-import 'incident_status_screen.dart';
-import 'login_screen.dart';
 import 'incident_detail_screen.dart';
+import 'login_screen.dart';
 import 'incident_report_screen.dart';
 
 class MainMapScreen extends StatefulWidget {
@@ -86,13 +85,32 @@ class _MainMapScreenState extends State<MainMapScreen> {
       _isLoadingLocation = true;
     });
 
+    String errorDetails = '';
+    
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      // Check location service with longer timeout
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          errorDetails = 'Location service check timed out';
+          return false;
+        },
+      );
+      
       if (!serviceEnabled) {
+        errorDetails = 'Location services are disabled in device settings';
         throw Exception('Location services are disabled.');
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+      // Check permission with longer timeout
+      LocationPermission permission = await Geolocator.checkPermission().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          errorDetails = 'Permission check timed out';
+          return LocationPermission.denied;
+        },
+      );
+      
       if (permission == LocationPermission.denied) {
         // Set flag to prevent multiple permission requests
         if (_isRequestingPermission) {
@@ -103,8 +121,16 @@ class _MainMapScreenState extends State<MainMapScreen> {
         });
         
         try {
-          permission = await Geolocator.requestPermission();
+          // Request permission with longer timeout
+          permission = await Geolocator.requestPermission().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              errorDetails = 'Permission request timed out';
+              return LocationPermission.denied;
+            },
+          );
           if (permission == LocationPermission.denied) {
+            errorDetails = 'Location permission denied by user';
             throw Exception('Location permissions are denied');
           }
         } finally {
@@ -115,13 +141,36 @@ class _MainMapScreenState extends State<MainMapScreen> {
       }
 
       if (permission == LocationPermission.deniedForever) {
+        errorDetails = 'Location permission permanently denied. Enable in Settings > Privacy & Security > Location Services';
         throw Exception('Location permissions are permanently denied');
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
+      // Get position with more reasonable timeout and better accuracy options
+      Position position;
+      try {
+        // Try high accuracy first
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            throw Exception('High accuracy location timed out');
+          },
+        );
+      } catch (e) {
+        // Fallback to medium accuracy if high accuracy fails
+        print('High accuracy failed: $e, trying medium accuracy');
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium,
+          timeLimit: const Duration(seconds: 8),
+        ).timeout(
+          const Duration(seconds: 12),
+          onTimeout: () {
+            throw Exception('Medium accuracy location also timed out');
+          },
+        );
+      }
       
       // Validate coordinates are reasonable (not default/error values)
       if (position.latitude != 0.0 && position.longitude != 0.0) {
@@ -133,19 +182,41 @@ class _MainMapScreenState extends State<MainMapScreen> {
         // Move map to current location
         if (mounted) {
           mapController.move(_currentCenter, 15.0);
-        }
-      } else {
-        // Keep Bangkok default if coordinates are invalid
-        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unable to get location, using Bangkok default')),
+            SnackBar(
+              content: Text('Location found: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
           );
         }
+      } else {
+        errorDetails = 'Invalid coordinates received (0,0)';
+        throw Exception('Invalid location coordinates');
       }
     } catch (e) {
       if (mounted) {
+        // Use Bangkok default on any error
+        setState(() {
+          _currentCenter = const LatLng(13.7563, 100.5018); // Bangkok default
+        });
+        mapController.move(_currentCenter, 12.0);
+        
+        // Show detailed error message
+        final errorMessage = errorDetails.isNotEmpty 
+            ? 'Location Error: $errorDetails' 
+            : 'Location Error: ${e.toString()}';
+            
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting location: $e')),
+          SnackBar(
+            content: Text('$errorMessage\nUsing Bangkok default location'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () => _getCurrentLocation(),
+            ),
+          ),
         );
       }
     } finally {
@@ -1219,34 +1290,50 @@ class _MainMapScreenState extends State<MainMapScreen> {
 
 
   void _listenToUnreadMessages() {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    // Listen to all chats where current user is a participant
     _firestore
         .collection('chats')
-        .where('participants', arrayContains: currentUser.uid)
+        .where('participants', arrayContains: user.uid)
         .snapshots()
-        .listen((chatSnapshot) {
-      int totalUnread = 0;
+        .listen((snapshot) async {
+      int chatsWithUnreadMessages = 0;
       
-      for (var chatDoc in chatSnapshot.docs) {
-        final chatData = chatDoc.data();
-        final lastReadTimestamp = chatData['lastRead_${currentUser.uid}'] as Timestamp?;
-        final lastMessageTimestamp = chatData['lastMessageTimestamp'] as Timestamp?;
-        final lastSenderId = chatData['lastSenderId'] as String?;
+      // Process all chats in parallel to reduce flickering
+      final futures = snapshot.docs.map((doc) async {
+        final data = doc.data();
+        final chatId = doc.id;
         
-        // If there's a new message after last read and it's not from current user
-        if (lastMessageTimestamp != null && 
-            lastSenderId != currentUser.uid &&
-            (lastReadTimestamp == null || lastMessageTimestamp.compareTo(lastReadTimestamp) > 0)) {
-          totalUnread++;
+        // Check if this chat has any unread messages
+        final lastReadTime = data['lastRead_${user.uid}'] ?? Timestamp.fromDate(DateTime(2020));
+        
+        try {
+          final allMessages = await _firestore
+              .collection('chats')
+              .doc(chatId)
+              .collection('messages')
+              .where('timestamp', isGreaterThan: lastReadTime)
+              .limit(1) // Only need to check if there's at least one
+              .get();
+              
+          // Check if there are any messages from other users
+          return allMessages.docs.any((doc) {
+            final messageData = doc.data();
+            return messageData['senderId'] != user.uid;
+          });
+        } catch (e) {
+          print('Error checking unread messages for chat $chatId: $e');
+          return false;
         }
-      }
+      }).toList();
+      
+      final results = await Future.wait(futures);
+      chatsWithUnreadMessages = results.where((hasUnread) => hasUnread).length;
       
       if (mounted) {
         setState(() {
-          _unreadChatCount = totalUnread;
+          _unreadChatCount = chatsWithUnreadMessages;
         });
       }
     });
@@ -1362,7 +1449,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
         children: [
           const ChatListScreen(),
           _buildMapWithSearch(),
-          const IncidentStatusScreen(),
+          const IncidentReportScreen(),
           const ProfileScreen(),
         ],
       ),
@@ -2383,10 +2470,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                             final result = await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => IncidentReportScreen(
-                                  latitude: _selectedLocation!.latitude,
-                                  longitude: _selectedLocation!.longitude,
-                                ),
+                                builder: (_) => const IncidentReportScreen(),
                               ),
                             );
                             

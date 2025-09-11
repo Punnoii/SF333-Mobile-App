@@ -17,214 +17,261 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final Map<String, DocumentSnapshot> _userCache = {};
+  final Map<String, Map<String, dynamic>> _userCache = {};
 
-  Future<DocumentSnapshot> _getUserData(String userId) async {
+  Future<Map<String, dynamic>?> _getUserData(String userId) async {
     if (_userCache.containsKey(userId)) {
-      return _userCache[userId]!;
+      return _userCache[userId];
     }
     
     final doc = await _firestore.collection('users').doc(userId).get();
-    _userCache[userId] = doc;
-    return doc;
+    if (doc.exists) {
+      final userData = doc.data() as Map<String, dynamic>;
+      _userCache[userId] = userData;
+      return userData;
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final themeService = Provider.of<ThemeService>(context);
-    final isDark = themeService.isDarkMode;
-    
-    if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('Please login to view chats')),
-      );
-    }
+    return Consumer<ThemeService>(
+      builder: (context, themeService, child) {
+        final isDark = themeService.isDarkMode;
+        final user = FirebaseAuth.instance.currentUser;
+        
+        if (user == null) {
+          return const Scaffold(
+            body: Center(child: Text('Please log in')),
+          );
+        }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: isDark ? Colors.black : Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search, color: isDark ? Colors.tealAccent : Colors.teal),
-            onPressed: () {
-              _showNewChatDialog();
-            },
-          ),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore
-            .collection('chats')
-            .where('participants', arrayContains: user.uid)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final chats = snapshot.data?.docs ?? [];
-
-          if (chats.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.chat_bubble_outline, size: 64, color: isDark ? Colors.grey[600] : Colors.grey[500]),
-                  const SizedBox(height: 16),
-                  Text('No chats yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.grey[700])),
-                  const SizedBox(height: 8),
-                  Text('Tap + to start a new conversation', style: TextStyle(color: isDark ? Colors.grey[600] : Colors.grey[600])),
-                ],
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.w600)),
+            backgroundColor: isDark ? Colors.black : Colors.white,
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: Icon(Icons.search, color: isDark ? Colors.tealAccent : Colors.teal),
+                onPressed: () {
+                  // TODO: Implement new chat dialog
+                },
               ),
-            );
-          }
+            ],
+          ),
+          body: StreamBuilder<QuerySnapshot>(
+            stream: _firestore
+                .collection('chats')
+                .where('participants', arrayContains: user.uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
 
-          return ListView.builder(
-            itemCount: chats.length,
-            itemBuilder: (context, index) {
-              final chat = chats[index];
-              final data = chat.data() as Map<String, dynamic>;
-              final chatId = chat.id;
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final chats = snapshot.data?.docs ?? [];
               
-              final participants = List<String>.from(data['participants'] ?? []);
-              final otherUserId = participants.firstWhere(
-                (id) => id != user.uid,
-                orElse: () => '',
-              );
+              // Sort chats by last message timestamp (client-side sorting)
+              chats.sort((a, b) {
+                final aData = a.data() as Map<String, dynamic>;
+                final bData = b.data() as Map<String, dynamic>;
+                final aTime = aData['lastMessageTimestamp'] as Timestamp?;
+                final bTime = bData['lastMessageTimestamp'] as Timestamp?;
+                
+                if (aTime == null && bTime == null) return 0;
+                if (aTime == null) return 1;
+                if (bTime == null) return -1;
+                
+                return bTime.compareTo(aTime); // Descending order (newest first)
+              });
 
-              return FutureBuilder<DocumentSnapshot>(
-                key: ValueKey(otherUserId), // Add key to prevent rebuilds
-                future: _getUserData(otherUserId),
-                builder: (context, userSnapshot) {
-                  if (userSnapshot.connectionState == ConnectionState.waiting) {
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.grey[900] : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!, width: 0.5),
-                        boxShadow: isDark ? [] : [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const ListTile(
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        leading: CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Colors.grey,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        title: Text('Loading...', style: TextStyle(color: Colors.grey)),
-                      ),
-                    );
-                  }
+              if (chats.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chat_bubble_outline, size: 64, color: isDark ? Colors.grey[600] : Colors.grey[500]),
+                      const SizedBox(height: 16),
+                      Text('No chats yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.grey[700])),
+                      const SizedBox(height: 8),
+                      Text('Start a conversation!', style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[500] : Colors.grey[600])),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                itemCount: chats.length,
+                itemBuilder: (context, index) {
+                  final chat = chats[index];
+                  final data = chat.data() as Map<String, dynamic>;
+                  final chatId = chat.id;
+                  final participants = List<String>.from(data['participants'] ?? []);
+                  final otherUserId = participants.firstWhere((id) => id != user.uid, orElse: () => '');
                   
-                  final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
-                  final otherUserName = userData?['username'] ?? userData?['fullName'] ?? userData?['email']?.split('@')[0] ?? 'Unknown';
+                  if (otherUserId.isEmpty) return const SizedBox.shrink();
 
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.grey[900] : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!, width: 0.5),
-                      boxShadow: isDark ? [] : [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      leading: CircleAvatar(
-                        radius: 24,
-                        backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
-                        child: userData?['profileImageUrl'] != null
-                            ? ClipOval(
-                                child: CachedNetworkImage(
-                                  imageUrl: userData!['profileImageUrl'],
-                                  width: 48,
-                                  height: 48,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => const CircularProgressIndicator(),
-                                  errorWidget: (context, url, error) => const Icon(Icons.person),
-                                ),
-                              )
-                            : const Icon(Icons.person),
-                      ),
-                      title: Text(
-                        otherUserName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600, 
-                          fontSize: 16,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                      subtitle: Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          data['lastMessage'] ?? 'No messages yet',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 14),
-                        ),
-                      ),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (data['lastMessageTime'] != null)
-                            Text(
-                              DateFormat('MMM d').format(
-                                (data['lastMessageTime'] as Timestamp).toDate(),
-                              ),
-                              style: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[600], fontSize: 12),
-                            ),
-                          const SizedBox(height: 4),
-                          Icon(Icons.chevron_right, color: isDark ? Colors.grey[600] : Colors.grey[500], size: 20),
-                        ],
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(
-                              chatId: chatId,
-                              otherUserName: otherUserName,
-                              otherUserId: otherUserId,
+                  return FutureBuilder<Map<String, dynamic>?>(
+                    future: _getUserData(otherUserId),
+                    builder: (context, userSnapshot) {
+                      if (!userSnapshot.hasData) {
+                        return const ListTile(
+                          leading: CircleAvatar(child: Icon(Icons.person)),
+                          title: Text('Loading...'),
+                        );
+                      }
+
+                      final userData = userSnapshot.data;
+                      final otherUserName = userData?['fullName'] ?? userData?['username'] ?? 'Unknown User';
+                      final profileImageUrl = userData?['profileImageUrl'];
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        elevation: 2,
+                        color: isDark ? Colors.grey[850] : Colors.white,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: isDark ? Colors.grey[700] : Colors.grey[300],
+                            child: profileImageUrl != null
+                                ? ClipOval(
+                                    child: CachedNetworkImage(
+                                      imageUrl: profileImageUrl,
+                                      width: 40,
+                                      height: 40,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => const CircularProgressIndicator(),
+                                      errorWidget: (context, url, error) => const Icon(Icons.person),
+                                    ),
+                                  )
+                                : const Icon(Icons.person),
+                          ),
+                          title: Text(
+                            otherUserName,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600, 
+                              fontSize: 16,
+                              color: isDark ? Colors.white : Colors.black87,
                             ),
                           ),
-                        );
-                      },
-                    ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              data['lastMessage'] ?? 'No messages yet',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 14),
+                            ),
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (data['lastMessageTimestamp'] != null)
+                                    Text(
+                                      DateFormat('MMM d').format(
+                                        (data['lastMessageTimestamp'] as Timestamp).toDate(),
+                                      ),
+                                      style: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[600], fontSize: 12),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  // Unread message indicator with debouncing to prevent flickering
+                                  StreamBuilder<QuerySnapshot>(
+                                    stream: _firestore
+                                        .collection('chats')
+                                        .doc(chatId)
+                                        .collection('messages')
+                                        .where('timestamp', isGreaterThan: data['lastRead_${user.uid}'] ?? Timestamp.fromDate(DateTime(2020)))
+                                        .snapshots(),
+                                    builder: (context, unreadSnapshot) {
+                                      // Show loading state briefly to prevent flickering
+                                      if (unreadSnapshot.connectionState == ConnectionState.waiting && !unreadSnapshot.hasData) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      
+                                      if (!unreadSnapshot.hasData) return const SizedBox.shrink();
+                                      
+                                      // Filter messages from other users client-side
+                                      final unreadFromOthers = unreadSnapshot.data!.docs.where((doc) {
+                                        final messageData = doc.data() as Map<String, dynamic>;
+                                        return messageData['senderId'] != user.uid;
+                                      }).length;
+                                      
+                                      if (unreadFromOthers > 0) {
+                                        return AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.red.withOpacity(0.3),
+                                                blurRadius: 4,
+                                                spreadRadius: 1,
+                                              ),
+                                            ],
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 20,
+                                            minHeight: 20,
+                                          ),
+                                          child: Text(
+                                            unreadFromOthers > 99 ? '99+' : unreadFromOthers.toString(),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                            ],
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(
+                                  chatId: chatId,
+                                  otherUserName: otherUserName,
+                                  otherUserId: otherUserId,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
                   );
                 },
               );
             },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showNewChatDialog();
-        },
-        backgroundColor: isDark ? Colors.tealAccent : Colors.teal,
-        foregroundColor: isDark ? Colors.black : Colors.white,
-        child: const Icon(Icons.add),
-      ),
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              _showNewChatDialog();
+            },
+            backgroundColor: isDark ? Colors.tealAccent : Colors.teal,
+            foregroundColor: isDark ? Colors.black : Colors.white,
+            child: const Icon(Icons.add),
+          ),
+        );
+      },
     );
   }
 

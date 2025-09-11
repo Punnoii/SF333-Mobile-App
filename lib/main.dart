@@ -10,15 +10,39 @@ import 'screens/register_screen.dart';
 import 'screens/change_password_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'services/theme_service.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-  
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const MyApp());
+  try {
+    // Load environment variables with timeout
+    await dotenv.load(fileName: ".env").timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        print('Environment loading timed out, continuing with defaults');
+      },
+    );
+    
+    // Initialize Firebase with timeout
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        throw Exception('Firebase initialization timed out');
+      },
+    );
+    
+    // Initialize notification service
+    await NotificationService.initialize();
+    
+    runApp(const MyApp());
+  } catch (e) {
+    print('App initialization error: $e');
+    // Run app anyway with limited functionality
+    runApp(const MyApp());
+  }
 }
 
 class MyApp extends StatelessWidget {

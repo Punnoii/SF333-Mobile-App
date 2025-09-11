@@ -15,14 +15,28 @@ class CloudinaryService {
       final file = await http.MultipartFile.fromPath('file', imageFile.path);
       request.files.add(file);
       
-      final response = await request.send();
+      // Add timeout to prevent hanging uploads
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Upload request timed out');
+        },
+      );
       
       if (response.statusCode == 200) {
-        final responseData = await response.stream.bytesToString();
+        final responseData = await response.stream.bytesToString().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Response reading timed out');
+          },
+        );
         final jsonData = json.decode(responseData);
         return jsonData['secure_url'];
       } else {
-        final responseData = await response.stream.bytesToString();
+        final responseData = await response.stream.bytesToString().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => 'Response timeout',
+        );
         print('Cloudinary upload failed with status: ${response.statusCode}');
         print('Response body: $responseData');
         print('Request fields: ${request.fields}');

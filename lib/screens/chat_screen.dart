@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'dart:io';
 import '../services/cloudinary_service.dart';
 import '../services/theme_service.dart';
+import '../services/notification_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -36,10 +37,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _markChatAsRead();
+    // Mark as read again when user scrolls or interacts
+    _scrollController.addListener(_onScroll);
+  }
+  
+  void _onScroll() {
+    // Mark as read when user scrolls (indicating they're actively reading)
+    _markChatAsRead();
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -50,6 +59,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (currentUser == null) return;
 
     try {
+      // Update lastRead timestamp to current time
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(widget.chatId)
+          .update({
+        'lastRead_${currentUser.uid}': FieldValue.serverTimestamp(),
+      });
+      
+      // Also update with a more recent timestamp to ensure it's newer than any message
+      await Future.delayed(const Duration(milliseconds: 100));
       await FirebaseFirestore.instance
           .collection('chats')
           .doc(widget.chatId)
@@ -110,6 +129,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         'lastMessageTimestamp': FieldValue.serverTimestamp(),
         'lastSenderId': user.uid,
       });
+
+      // Send notification to other user
+      await NotificationService.sendChatNotification(
+        recipientId: widget.otherUserId,
+        senderName: user.displayName ?? user.email?.split('@')[0] ?? 'Someone',
+        message: imageUrl != null ? '📷 Photo' : messageText,
+        chatId: widget.chatId,
+      );
 
       // Message sent successfully - UI already cleared
       // Scroll to bottom after sending message
@@ -398,6 +425,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   }
 
                   final messages = snapshot.data!.docs;
+
+                  // Mark as read when messages are loaded
+                  if (messages.isNotEmpty) {
+                    Future.delayed(const Duration(milliseconds: 500), () {
+                      _markChatAsRead();
+                    });
+                  }
 
                   // Always scroll to latest message - delay to ensure ListView is built
                   Future.delayed(const Duration(milliseconds: 100), () {
