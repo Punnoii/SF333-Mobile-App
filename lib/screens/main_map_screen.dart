@@ -14,6 +14,7 @@ import 'profile_screen.dart';
 import 'incident_detail_screen.dart';
 import 'login_screen.dart';
 import 'incident_report_screen.dart';
+import 'incident_form_screen.dart';
 
 class MainMapScreen extends StatefulWidget {
   static const String routeName = '/main';
@@ -49,6 +50,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
   Map<String, dynamic>? _selectedIncident;
   String? _selectedIncidentId;
   LatLng? _radarCenter; // Center of radar circle
+  bool _radarConfirmed = false; // Track if user confirmed the radius
   
   // Double-click detection
   Timer? _tapTimer;
@@ -1171,7 +1173,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
   }
 
   Future<void> _loadNearbyIncidents() async {
-    if (_radarCenter == null) return;
+    if (_radarCenter == null || !_radarConfirmed) return;
     
     try {
       final QuerySnapshot snapshot = await FirebaseFirestore.instance
@@ -1205,9 +1207,31 @@ class _MainMapScreenState extends State<MainMapScreen> {
       
       setState(() {
         _nearbyIncidents = incidents;
+        _showIncidentPanel = incidents.isNotEmpty;
       });
+      
+      // Show confirmation message
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars(); // Clear any existing snackbars first
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Found ${incidents.length} incidents within ${_radarRadius.toStringAsFixed(1)} km radius'),
+            backgroundColor: Colors.teal,
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.fixed, // Prevent floating behavior
+          ),
+        );
+      }
     } catch (e) {
       print('Error loading incidents: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
   
@@ -1229,31 +1253,12 @@ class _MainMapScreenState extends State<MainMapScreen> {
   }
   
   void _handleMapTap(LatLng point) {
-    if (_tapTimer != null && _tapTimer!.isActive) {
-      // This is a double tap - place pin and set radar center
-      _tapTimer?.cancel();
-      setState(() {
-        _selectedLocation = point;
-        _radarCenter = point;
-        _showPopup = true;
-        _showSearchResults = false;
-      });
-      
-      // Reload incidents for new radar center
-      if (_showIncidentRadar) {
-        _loadNearbyIncidents();
-      }
-    } else {
-      // This is the first tap - start timer for double-tap detection
-      _tapTimer = Timer(const Duration(milliseconds: 300), () {
-        // Single tap timeout - show popup for incident reporting
-        setState(() {
-          _selectedLocation = point;
-          _showPopup = true;
-          _showSearchResults = false;
-        });
-      });
-    }
+    // Single tap - show popup with pin
+    setState(() {
+      _selectedLocation = point;
+      _showPopup = true;
+      _showSearchResults = false;
+    });
   }
 
   // Search places from external API using LocationService
@@ -1600,20 +1605,20 @@ class _MainMapScreenState extends State<MainMapScreen> {
             Positioned(
               top: MediaQuery.of(context).padding.top + 70,
               left: 16,
-              right: 16,
+              right: 80, // Leave space for radar button
               child: _buildSearchResults(isDark),
             ),
           // Radar control button
           Positioned(
             right: 16,
-            top: MediaQuery.of(context).padding.top + 120,
+            top: MediaQuery.of(context).padding.top + 70,
             child: _buildRadarToggle(isDark),
           ),
           // Radar radius control
           if (_showIncidentRadar)
             Positioned(
               right: 16,
-              top: MediaQuery.of(context).padding.top + 180,
+              top: MediaQuery.of(context).padding.top + 120,
               child: Container(
                 width: 200,
                 padding: const EdgeInsets.all(12),
@@ -1632,14 +1637,14 @@ class _MainMapScreenState extends State<MainMapScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Radar Range',
+                      'Search Radius',
                       style: TextStyle(
                         color: isDark ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Text(
@@ -1660,19 +1665,75 @@ class _MainMapScreenState extends State<MainMapScreen> {
                               setState(() {
                                 _radarRadius = value;
                               });
-                              _loadNearbyIncidents();
+                              // If radar is already confirmed, update incidents with new radius
+                              if (_radarConfirmed && _radarCenter != null) {
+                                _loadNearbyIncidents();
+                              }
                             },
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _radarCenter != null ? () {
+                          setState(() {
+                            _radarConfirmed = true;
+                          });
+                          _loadNearbyIncidents();
+                        } : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.tealAccent,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.search, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              _radarConfirmed ? 'Search Again' : 'OK',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_radarCenter == null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Tap map and press "Set Center" to select center',
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontSize: 9,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
-          // Incident details panel
+          // Incident details panel - positioned at bottom to avoid overlap
           if (_showIncidentPanel && _selectedIncident != null)
-            _buildIncidentPanel(isDark),
+            Positioned(
+              bottom: 20,
+              left: 16,
+              right: 16,
+              child: _buildIncidentPanel(isDark),
+            ),
         ],
       ),
     );
@@ -1817,8 +1878,12 @@ class _MainMapScreenState extends State<MainMapScreen> {
       onPressed: () {
         setState(() {
           _showIncidentRadar = !_showIncidentRadar;
-          if (_showIncidentRadar) {
-            _loadNearbyIncidents();
+          if (!_showIncidentRadar) {
+            // Reset everything when turning off radar
+            _radarConfirmed = false;
+            _nearbyIncidents.clear();
+            _showIncidentPanel = false;
+            _radarCenter = null;
           }
         });
       },
@@ -1841,7 +1906,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
         },
         child: CustomPaint(
           painter: RadarPainter(
-            center: _currentCenter,
+            center: _radarCenter ?? _currentCenter,
             radius: _radarRadius,
             incidents: _nearbyIncidents,
             onIncidentTap: (incident) {
@@ -1946,7 +2011,9 @@ class _MainMapScreenState extends State<MainMapScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'พบการแจ้งเหตุในรัศมี (${_nearbyIncidents.length} รายการ)',
+                        _radarConfirmed 
+                          ? 'พบการแจ้งเหตุในรัศมี (${_nearbyIncidents.length} รายการ)'
+                          : 'กำหนดรัศมีและกดตกลงเพื่อค้นหา',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -1966,13 +2033,48 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(16),
-                    child: _nearbyIncidents.isEmpty
+                    child: !_radarConfirmed
                         ? Center(
-                            child: Text(
-                              'ไม่พบเหตุการณ์ในรัศมีนี้',
-                              style: TextStyle(
-                                color: isDark ? Colors.grey[400] : Colors.grey[600],
-                              ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.touch_app,
+                                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'แตะ 2 ครั้งบนแผนที่เพื่อเลือกจุดศูนย์กลาง\nจากนั้นกำหนดรัศมีและกดตกลง',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        : _nearbyIncidents.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'ไม่พบเหตุการณ์ในรัศมี ${_radarRadius.toStringAsFixed(1)} กม.',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
                           )
                         : ListView.separated(
@@ -2332,7 +2434,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                         width: 30,
                         height: 30,
                         decoration: BoxDecoration(
-                          color: Colors.green,
+                          color: Colors.red,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
@@ -2340,6 +2442,36 @@ class _MainMapScreenState extends State<MainMapScreen> {
                           Icons.location_on,
                           color: Colors.white,
                           size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              // Radar center marker (green pin)
+              if (_radarCenter != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _radarCenter!,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.5),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.gps_fixed,
+                          color: Colors.white,
+                          size: 20,
                         ),
                       ),
                     ),
@@ -2428,96 +2560,158 @@ class _MainMapScreenState extends State<MainMapScreen> {
                     style: TextStyle(color: isDark ? Colors.grey : Colors.black54),
                   ),
                   const SizedBox(height: 12),
+                  // First row with Report and Set Center Point buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Colors.red, Colors.redAccent],
-                          ),
-                          borderRadius: BorderRadius.circular(25),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.withOpacity(0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Colors.red, Colors.redAccent],
                             ),
-                          ],
-                        ),
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.report_problem),
-                          label: const Text('Report'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                          ),
-                          onPressed: () async {
-                            final user = FirebaseAuth.instance.currentUser;
-                            if (user == null) {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                              );
-                              if (FirebaseAuth.instance.currentUser == null) return;
-                            }
-                            
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const IncidentReportScreen(),
+                            borderRadius: BorderRadius.circular(25),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.red.withOpacity(0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                            );
-                            
-                            if (result == true) {
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.report_problem, size: 18),
+                            label: const Text('Report', style: TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                            ),
+                            onPressed: () async {
+                              final user = FirebaseAuth.instance.currentUser;
+                              if (user == null) {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                                );
+                                if (FirebaseAuth.instance.currentUser == null) return;
+                              }
+                              
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => IncidentFormScreen(
+                                    latitude: _selectedLocation?.latitude,
+                                    longitude: _selectedLocation?.longitude,
+                                  ),
+                                ),
+                              );
+                              
+                              if (result == true) {
+                                setState(() {
+                                  _showPopup = false;
+                                  _selectedLocation = null;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Colors.teal, Colors.tealAccent],
+                            ),
+                            borderRadius: BorderRadius.circular(25),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.teal.withOpacity(0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.center_focus_strong, size: 18),
+                            label: const Text('Set Center', style: TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                            ),
+                            onPressed: () {
                               setState(() {
+                                _radarCenter = _selectedLocation;
+                                _radarConfirmed = false; // Reset confirmation when center changes
+                                _nearbyIncidents.clear();
+                                _showIncidentPanel = false;
                                 _showPopup = false;
                                 _selectedLocation = null;
                               });
-                            }
-                          },
-                        ),
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.grey[700]!, Colors.grey[600]!],
+                              
+                              // Show feedback message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Radar center point set! Adjust radius and press OK to search.'),
+                                  backgroundColor: Colors.teal,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
                           ),
-                          borderRadius: BorderRadius.circular(25),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.close),
-                          label: const Text('Cancel'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _showPopup = false;
-                              _selectedLocation = null;
-                            });
-                          },
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Second row with Cancel button
+                  SizedBox(
+                    width: double.infinity,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.grey[700]!, Colors.grey[600]!],
+                        ),
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.close, size: 18),
+                        label: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _showPopup = false;
+                            _selectedLocation = null;
+                          });
+                        },
+                      ),
+                    ),
                   ),
                 ],
               ),
