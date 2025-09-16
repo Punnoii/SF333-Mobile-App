@@ -11,7 +11,7 @@ class AppConfig {
   static String get firebaseMessagingSenderId => dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '';
   static String get firebaseProjectId => dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
   static String get firebaseStorageBucket => dotenv.env['FIREBASE_STORAGE_BUCKET'] ?? '';
-
+  static String get firebasebundleiosId => dotenv.env['FIREBASE_BUNDLE_IOS_ID'] ?? '';
   // Cloudinary Configuration
   static String get cloudinaryCloudName => dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
   static String get cloudinaryUploadPreset => dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';

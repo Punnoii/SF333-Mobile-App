@@ -52,29 +52,29 @@ class DefaultFirebaseOptions {
     storageBucket: AppConfig.firebaseStorageBucket,
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBA-NoOxzyV8qdmBEj1Z-oAsZaK5BBvwv8',
-    appId: '1:899471675960:android:7b733835885ddf5e454ccd',
-    messagingSenderId: '899471675960',
-    projectId: 'paisabaiproject',
-    storageBucket: 'paisabaiproject.firebasestorage.app',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: AppConfig.firebaseApiKeyAndroid,
+    appId: AppConfig.firebaseAppIdAndroid,
+    messagingSenderId: AppConfig.firebaseMessagingSenderId,
+    projectId: AppConfig.firebaseProjectId,
+    storageBucket: AppConfig.firebaseStorageBucket,
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyD-0J0zFbZuGv4MZ2nMm8sadrxn26w52nA',
-    appId: '1:899471675960:ios:97371700b13bc3d4454ccd',
-    messagingSenderId: '899471675960',
-    projectId: 'paisabaiproject',
-    storageBucket: 'paisabaiproject.firebasestorage.app',
-    iosBundleId: 'com.example.paisabaiApp',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: AppConfig.firebaseApiKeyIos,
+    appId: AppConfig.firebaseAppIdIos,
+    messagingSenderId: AppConfig.firebaseMessagingSenderId,
+    projectId: AppConfig.firebaseProjectId,
+    storageBucket: AppConfig.firebaseStorageBucket,
+    iosBundleId: AppConfig.firebasebundleiosId,
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyD-0J0zFbZuGv4MZ2nMm8sadrxn26w52nA',
-    appId: '1:899471675960:ios:97371700b13bc3d4454ccd',
-    messagingSenderId: '899471675960',
-    projectId: 'paisabaiproject',
-    storageBucket: 'paisabaiproject.firebasestorage.app',
-    iosBundleId: 'com.example.paisabaiApp',
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: AppConfig.firebaseApiKeyIos,
+    appId: AppConfig.firebaseAppIdIos,
+    messagingSenderId: AppConfig.firebaseMessagingSenderId,
+    projectId: AppConfig.firebaseProjectId,
+    storageBucket: AppConfig.firebaseStorageBucket,
+    iosBundleId: AppConfig.firebasebundleiosId,
   );
 }
