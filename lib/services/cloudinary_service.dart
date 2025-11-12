@@ -7,6 +7,29 @@ import '../config/app_config.dart';
 class CloudinaryService {
   static String get _cloudName => AppConfig.cloudinaryCloudName;
   static String get _uploadPreset => AppConfig.cloudinaryUploadPreset;
+  static http.Client _httpClient = http.Client();
+
+  static String get _baseUploadUrl =>
+      _cloudName.isEmpty ? '' : 'https://api.cloudinary.com/v1_1/$_cloudName/image/upload';
+
+  static String get _baseImageUrl {
+    final basePath = AppConfig.cloudinaryBaseImagePath;
+    if (_cloudName.isEmpty || basePath.isEmpty) return '';
+    return 'https://res.cloudinary.com/$_cloudName/image/upload/$basePath';
+  }
+
+  /// Allow injecting a custom HTTP client (useful for tests).
+  @visibleForTesting
+  static void configure({http.Client? httpClient}) {
+    if (httpClient != null) {
+      _httpClient = httpClient;
+    }
+  }
+
+  @visibleForTesting
+  static void resetDependencies() {
+    _httpClient = http.Client();
+  }
 
   static Future<String?> uploadProfileImage(File imageFile, String userId) async {
     if (_cloudName.isEmpty || _uploadPreset.isEmpty) {
@@ -15,7 +38,7 @@ class CloudinaryService {
     }
 
     try {
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
+      final url = Uri.parse(_baseUploadUrl);
       
       final request = http.MultipartRequest('POST', url);
       request.fields['upload_preset'] = _uploadPreset;
@@ -24,7 +47,7 @@ class CloudinaryService {
       request.files.add(file);
       
       // Add timeout to prevent hanging uploads
-      final response = await request.send().timeout(
+      final response = await _httpClient.send(request).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
           throw Exception('Upload request timed out');
@@ -57,13 +80,13 @@ class CloudinaryService {
   }
 
   static String getProfileImageUrl(String userId, {int width = 200, int height = 200}) {
-    if (_cloudName.isEmpty) return '';
-    return 'https://res.cloudinary.com/$_cloudName/image/upload/w_$width,h_$height,c_fill,g_face/paisabai/profiles/profile_$userId.jpg';
+    if (_baseImageUrl.isEmpty) return '';
+    return '$_baseImageUrl/w_$width,h_$height,c_fill,g_face/profiles/profile_$userId.jpg';
   }
 
   static String getOptimizedImageUrl(String publicId, {int width = 200, int height = 200}) {
-    if (_cloudName.isEmpty) return '';
-    return 'https://res.cloudinary.com/$_cloudName/image/upload/w_$width,h_$height,c_fill/$publicId';
+    if (_baseImageUrl.isEmpty) return '';
+    return '$_baseImageUrl/w_$width,h_$height,c_fill/$publicId';
   }
 
   // Get list of available avatar options
@@ -83,7 +106,7 @@ class CloudinaryService {
 
   // Get avatar URL by name
   static String getAvatarUrl(String avatarName, {int width = 200, int height = 200}) {
-    if (_cloudName.isEmpty) return '';
-    return 'https://res.cloudinary.com/$_cloudName/image/upload/w_$width,h_$height,c_fill/$avatarName.png';
+    if (_baseImageUrl.isEmpty) return '';
+    return '$_baseImageUrl/w_$width,h_$height,c_fill/avatars/$avatarName.png';
   }
 }

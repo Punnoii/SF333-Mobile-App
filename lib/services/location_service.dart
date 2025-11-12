@@ -11,10 +11,33 @@ class LocationService {
   static const Duration _cacheExpiry = Duration(hours: 24);
   
   // Configuration - set to false to disable API calls temporarily
-  static const bool _enableAPISearch = false;
+  static bool _enableApiSearch = false;
+  static http.Client _httpClient = http.Client();
   
   static String _lastQuery = '';
   static List<Map<String, dynamic>> _lastResults = [];
+
+  /// Allow overriding runtime configuration for testing or feature flags.
+  @visibleForTesting
+  static void configure({
+    bool? enableApiSearch,
+    http.Client? httpClient,
+  }) {
+    if (enableApiSearch != null) {
+      _enableApiSearch = enableApiSearch;
+    }
+    if (httpClient != null) {
+      _httpClient = httpClient;
+    }
+  }
+
+  @visibleForTesting
+  static void resetTestOverrides() {
+    _enableApiSearch = false;
+    _httpClient = http.Client();
+    _lastQuery = '';
+    _lastResults = [];
+  }
 
   /// Search for places using Nominatim (OpenStreetMap) API with caching and debouncing
   /// Returns a list of location results with coordinates and display names
@@ -37,7 +60,7 @@ class LocationService {
     }
     
     // Skip API call for very short queries to reduce load or if API is disabled
-    if (cleanQuery.length < 3 || !_enableAPISearch) {
+    if (cleanQuery.length < 3 || !_enableApiSearch) {
       return [];
     }
     
@@ -45,13 +68,15 @@ class LocationService {
       final encodedQuery = Uri.encodeComponent('$cleanQuery Thailand');
       final url = '$_nominatimBaseUrl?q=$encodedQuery&format=json&limit=10&countrycodes=th&addressdetails=1';
       
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)',
-          'Accept': 'application/json',
-        },
-      ).timeout(_timeout);
+      final response = await _httpClient
+          .get(
+            Uri.parse(url),
+            headers: {
+              'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(_timeout);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -189,10 +214,12 @@ class LocationService {
   /// Check if the location service is available
   static Future<bool> isServiceAvailable() async {
     try {
-      final response = await http.get(
-        Uri.parse('$_nominatimBaseUrl?q=Bangkok&format=json&limit=1'),
-        headers: {'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)'},
-      ).timeout(const Duration(seconds: 2));
+      final response = await _httpClient
+          .get(
+            Uri.parse('$_nominatimBaseUrl?q=Bangkok&format=json&limit=1'),
+            headers: {'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)'},
+          )
+          .timeout(const Duration(seconds: 2));
       
       return response.statusCode == 200;
     } catch (e) {
