@@ -107,8 +107,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           onPressed: agree
                               ? () async {
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  final navigator = Navigator.of(context);
                                   if (passwordController.text != confirmPasswordController.text) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(content: Text('Passwords do not match')),
                                     );
                                     return;
@@ -134,12 +136,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     });
                                     
                                     if (!mounted) return;
-                                    Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(content: Text('Registered successfully. Please login.')),
                                     );
+                                    if (!mounted) return;
+                                    navigator.pop();
                                   } on FirebaseAuthException catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    if (!mounted) return;
+                                    messenger.showSnackBar(
                                       SnackBar(content: Text(e.message ?? 'Register failed')),
                                     );
                                   }
@@ -171,5 +175,3 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
-
-

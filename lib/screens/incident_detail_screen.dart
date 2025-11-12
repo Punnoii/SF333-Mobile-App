@@ -307,7 +307,7 @@ class IncidentDetailScreen extends StatelessWidget {
                   color: isDark ? Colors.grey[800] : Colors.grey[100],
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.blue.withOpacity(0.3),
+                    color: Colors.blue.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -423,7 +423,7 @@ class IncidentDetailScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.green.withOpacity(0.3),
+                      color: Colors.green.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),

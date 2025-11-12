@@ -20,7 +20,7 @@ Future<void> main() async {
     await dotenv.load(fileName: ".env").timeout(
       const Duration(seconds: 5),
       onTimeout: () {
-        print('Environment loading timed out, continuing with defaults');
+        debugPrint('Environment loading timed out, continuing with defaults');
       },
     );
     
@@ -39,7 +39,7 @@ Future<void> main() async {
     
     runApp(const MyApp());
   } catch (e) {
-    print('App initialization error: $e');
+    debugPrint('App initialization error: $e');
     // Run app anyway with limited functionality
     runApp(const MyApp());
   }
@@ -73,4 +73,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

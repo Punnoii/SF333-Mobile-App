@@ -213,7 +213,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                             shape: BoxShape.circle,
                                             boxShadow: [
                                               BoxShadow(
-                                                color: Colors.red.withOpacity(0.3),
+                                                color: Colors.red.withValues(alpha: 0.3),
                                                 blurRadius: 4,
                                                 spreadRadius: 1,
                                               ),
@@ -323,8 +323,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
           TextButton(
             onPressed: () async {
+              final navigator = Navigator.of(context);
               await _startNewChat(emailController.text.trim());
-              Navigator.pop(context);
+              navigator.pop();
             },
             child: Text(
               'Start Chat',
@@ -341,6 +342,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
     
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
 
     try {
       // Search by email first
@@ -366,11 +369,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
       }
 
       if (userQuery.docs.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User not found')),
-          );
-        }
+        if (!mounted) return;
+        messenger.showSnackBar(
+          const SnackBar(content: Text('User not found')),
+        );
         return;
       }
 
@@ -406,24 +408,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
         chatId = chatRef.id;
       }
 
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChatScreen(
-              chatId: chatId!,
-              otherUserName: userData['username'] ?? userData['fullName'] ?? userData['email']?.split('@')[0] ?? 'Unknown',
-              otherUserId: otherUserId,
-            ),
+      if (!mounted) return;
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            chatId: chatId!,
+            otherUserName: userData['username'] ?? userData['fullName'] ?? userData['email']?.split('@')[0] ?? 'Unknown',
+            otherUserId: otherUserId,
           ),
-        );
-      }
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error starting chat: $e')),
-        );
-      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error starting chat: $e')),
+      );
     }
   }
 }

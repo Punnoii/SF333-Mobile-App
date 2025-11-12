@@ -156,7 +156,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
           ),
         ),
-        backgroundColor: Colors.black.withOpacity(0.9),
+        backgroundColor: Colors.black.withValues(alpha: 0.9),
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -164,8 +164,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.black.withOpacity(0.9),
-                Colors.grey[900]!.withOpacity(0.9),
+                Colors.black.withValues(alpha: 0.9),
+                Colors.grey[900]!.withValues(alpha: 0.9),
               ],
             ),
           ),
@@ -248,7 +248,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   borderRadius: BorderRadius.circular(25),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.tealAccent.withOpacity(0.3),
+                      color: Colors.tealAccent.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
@@ -284,6 +284,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   onPressed: () async {
                     final user = FirebaseAuth.instance.currentUser;
                     if (user == null) return;
+                    final messenger = ScaffoldMessenger.of(context);
+                    final navigator = Navigator.of(context);
 
                     try {
                       String? finalImageUrl;
@@ -296,28 +298,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       } else {
                         finalImageUrl = _currentProfileImageUrl;
                       }
+
+                      final email = emailController.text.trim();
+                      if (email.isEmpty) {
+                        if (!mounted) return;
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Email is required')),
+                        );
+                        return;
+                      }
                       
-                      // Update Firestore profile
+                      // Update Firestore profile without overriding createdAt
                       await FirebaseFirestore.instance
                           .collection('users')
                           .doc(user.uid)
                           .set({
                         'username': usernameController.text.trim(),
-                        'fullName': fullNameController.text.trim(), // Add fullName field
+                        'fullName': fullNameController.text.trim(),
                         'phoneNumber': phoneController.text.trim(),
                         'disabilityType': disabilityController.text.trim(),
                         'profileImageUrl': finalImageUrl ?? '',
-                        'email': user.email ?? '',
+                        'email': email,
                         'updatedAt': FieldValue.serverTimestamp(),
-                        'createdAt': FieldValue.serverTimestamp(),
                       }, SetOptions(merge: true));
                       if (!mounted) return;
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      messenger.showSnackBar(
                         const SnackBar(content: Text('Profile saved successfully')),
                       );
+                      if (!mounted) return;
+                      navigator.pop();
                     } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      if (!mounted) return;
+                      messenger.showSnackBar(
                         SnackBar(content: Text('Error saving profile: $e')),
                       );
                     }

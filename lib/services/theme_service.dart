@@ -55,7 +55,7 @@ class ThemeService extends ChangeNotifier {
     primarySwatch: Colors.teal,
     scaffoldBackgroundColor: Colors.black,
     appBarTheme: AppBarTheme(
-      backgroundColor: Colors.black.withOpacity(0.9),
+      backgroundColor: Colors.black.withValues(alpha: 0.9),
       foregroundColor: Colors.white,
       elevation: 0,
     ),

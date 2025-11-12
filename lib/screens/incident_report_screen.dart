@@ -190,7 +190,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                         color: isDark ? Colors.grey[850] : Colors.white,
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: _statusColors[status]?.withOpacity(0.2) ?? Colors.grey.withOpacity(0.2),
+                            backgroundColor: _statusColors[status]?.withValues(alpha: 0.2) ?? Colors.grey.withValues(alpha: 0.2),
                             child: Icon(
                               _categoryIcons[category] ?? Icons.report_problem,
                               color: _statusColors[status] ?? Colors.grey,
@@ -226,7 +226,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: _statusColors[status]?.withOpacity(0.2) ?? Colors.grey.withOpacity(0.2),
+                                      color: _statusColors[status]?.withValues(alpha: 0.2) ?? Colors.grey.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
@@ -327,7 +327,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: _statusColors[incident['status']]?.withOpacity(0.2) ?? Colors.grey.withOpacity(0.2),
+                            color: _statusColors[incident['status']]?.withValues(alpha: 0.2) ?? Colors.grey.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Text(

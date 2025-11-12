@@ -1,16 +1,24 @@
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
+import '../config/app_config.dart';
 
 class CloudinaryService {
-  static const String _cloudName = 'drmfjha9m';
-  
+  static String get _cloudName => AppConfig.cloudinaryCloudName;
+  static String get _uploadPreset => AppConfig.cloudinaryUploadPreset;
+
   static Future<String?> uploadProfileImage(File imageFile, String userId) async {
+    if (_cloudName.isEmpty || _uploadPreset.isEmpty) {
+      debugPrint('Missing Cloudinary configuration. Check CLOUDINARY_* entries in .env');
+      return null;
+    }
+
     try {
       final url = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
       
       final request = http.MultipartRequest('POST', url);
-      request.fields['upload_preset'] = 'ml_default';
+      request.fields['upload_preset'] = _uploadPreset;
       
       final file = await http.MultipartFile.fromPath('file', imageFile.path);
       request.files.add(file);
@@ -37,22 +45,24 @@ class CloudinaryService {
           const Duration(seconds: 5),
           onTimeout: () => 'Response timeout',
         );
-        print('Cloudinary upload failed with status: ${response.statusCode}');
-        print('Response body: $responseData');
-        print('Request fields: ${request.fields}');
+        debugPrint('Cloudinary upload failed with status: ${response.statusCode}');
+        debugPrint('Response body: $responseData');
+        debugPrint('Request fields: ${request.fields}');
         return null;
       }
     } catch (e) {
-      print('Cloudinary upload error: $e');
+      debugPrint('Cloudinary upload error: $e');
       return null;
     }
   }
 
   static String getProfileImageUrl(String userId, {int width = 200, int height = 200}) {
+    if (_cloudName.isEmpty) return '';
     return 'https://res.cloudinary.com/$_cloudName/image/upload/w_$width,h_$height,c_fill,g_face/paisabai/profiles/profile_$userId.jpg';
   }
 
   static String getOptimizedImageUrl(String publicId, {int width = 200, int height = 200}) {
+    if (_cloudName.isEmpty) return '';
     return 'https://res.cloudinary.com/$_cloudName/image/upload/w_$width,h_$height,c_fill/$publicId';
   }
 
@@ -73,6 +83,7 @@ class CloudinaryService {
 
   // Get avatar URL by name
   static String getAvatarUrl(String avatarName, {int width = 200, int height = 200}) {
+    if (_cloudName.isEmpty) return '';
     return 'https://res.cloudinary.com/$_cloudName/image/upload/w_$width,h_$height,c_fill/$avatarName.png';
   }
 }

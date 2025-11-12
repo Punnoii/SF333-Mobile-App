@@ -28,6 +28,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
   int currentIndex = 1; // Start with Home (map) tab
   final MapController mapController = MapController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  StreamSubscription<QuerySnapshot>? _unreadSubscription;
   final double _minZoom = 3;
   final double _maxZoom = 18;
   double _currentZoom = 12;
@@ -48,7 +49,6 @@ class _MainMapScreenState extends State<MainMapScreen> {
   List<Map<String, dynamic>> _nearbyIncidents = [];
   bool _showIncidentPanel = false;
   Map<String, dynamic>? _selectedIncident;
-  String? _selectedIncidentId;
   LatLng? _radarCenter; // Center of radar circle
   bool _radarConfirmed = false; // Track if user confirmed the radius
   
@@ -74,6 +74,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
     _searchController.dispose();
     _tapTimer?.cancel();
     _searchDebounceTimer?.cancel();
+    _unreadSubscription?.cancel();
     super.dispose();
   }
 
@@ -88,6 +89,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
     });
 
     String errorDetails = '';
+    final messenger = ScaffoldMessenger.of(context);
     
     try {
       // Check location service with longer timeout
@@ -162,7 +164,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
         );
       } catch (e) {
         // Fallback to medium accuracy if high accuracy fails
-        print('High accuracy failed: $e, trying medium accuracy');
+        debugPrint('High accuracy failed: $e, trying medium accuracy');
         position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.medium,
           timeLimit: const Duration(seconds: 8),
@@ -182,45 +184,43 @@ class _MainMapScreenState extends State<MainMapScreen> {
         });
         
         // Move map to current location
-        if (mounted) {
-          mapController.move(_currentCenter, 15.0);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Location found: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        if (!mounted) return;
+        mapController.move(_currentCenter, 15.0);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Location found: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
       } else {
         errorDetails = 'Invalid coordinates received (0,0)';
         throw Exception('Invalid location coordinates');
       }
     } catch (e) {
-      if (mounted) {
-        // Use Bangkok default on any error
-        setState(() {
-          _currentCenter = const LatLng(13.7563, 100.5018); // Bangkok default
-        });
-        mapController.move(_currentCenter, 12.0);
-        
-        // Show detailed error message
-        final errorMessage = errorDetails.isNotEmpty 
-            ? 'Location Error: $errorDetails' 
-            : 'Location Error: ${e.toString()}';
-            
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$errorMessage\nUsing Bangkok default location'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: () => _getCurrentLocation(),
-            ),
+      if (!mounted) return;
+      // Use Bangkok default on any error
+      setState(() {
+        _currentCenter = const LatLng(13.7563, 100.5018); // Bangkok default
+      });
+      mapController.move(_currentCenter, 12.0);
+      
+      // Show detailed error message
+      final errorMessage = errorDetails.isNotEmpty 
+          ? 'Location Error: $errorDetails' 
+          : 'Location Error: ${e.toString()}';
+          
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$errorMessage\nUsing Bangkok default location'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () => _getCurrentLocation(),
           ),
-        );
-      }
+        ),
+      );
     } finally {
       setState(() {
         _isLoadingLocation = false;
@@ -281,7 +281,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
       try {
         apiLocationResults = await _searchPlacesFromAPI(query);
       } catch (e) {
-        print('API search failed, using static database only: $e');
+        debugPrint('API search failed, using static database only: $e');
         // Continue with static results only
       }
     }
@@ -421,7 +421,6 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'Mahidol University Faculty of Information and Communication Technology': {'lat': 13.7946, 'lng': 100.3256},
       'Mahidol University International College': {'lat': 13.7946, 'lng': 100.3256},
       'Mahidol University College of Management': {'lat': 13.7946, 'lng': 100.3256},
-      'silpakorn university': {'lat': 13.8167, 'lng': 100.0437, 'name': 'Silpakorn University'},
       'assumption university': {'lat': 13.6167, 'lng': 100.6037, 'name': 'Assumption University'},
       'bangkok university': {'lat': 13.7767, 'lng': 100.5437, 'name': 'Bangkok University'},
       'dhurakij pundit university': {'lat': 13.7467, 'lng': 100.5637, 'name': 'Dhurakij Pundit University'},
@@ -547,7 +546,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'bearing': {'lat': 13.6598, 'lng': 100.6098, 'name': 'Bearing'},
       'samut prakan province': {'lat': 13.5998, 'lng': 100.5998, 'name': 'Samut Prakan Province'},
       'saphan phut': {'lat': 13.7398, 'lng': 100.5098, 'name': 'Saphan Phut'},
-      'huai khwang': {'lat': 13.7698, 'lng': 100.5798, 'name': 'Huai Khwang'},
+      // Huai Khwang already listed in districts section
       'wang thonglang': {'lat': 13.7798, 'lng': 100.5998, 'name': 'Wang Thonglang'},
       'din daeng': {'lat': 13.7698, 'lng': 100.5598, 'name': 'Din Daeng'},
       'phaya thai': {'lat': 13.7598, 'lng': 100.5398, 'name': 'Phaya Thai'},
@@ -600,7 +599,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'sanam luang': {'lat': 13.7548, 'lng': 100.4948, 'name': 'Sanam Luang'},
       'rot fai park': {'lat': 13.8098, 'lng': 100.5598, 'name': 'Rot Fai Park (Chatuchak)'},
       'suan rot fai': {'lat': 13.8098, 'lng': 100.5598, 'name': 'Suan Rot Fai'},
-      'king rama ix park': {'lat': 13.6898, 'lng': 100.6398, 'name': 'King Rama IX Park'},
+      // See main Bangkok landmarks section for King Rama IX Park
       'santiphap park': {'lat': 13.7798, 'lng': 100.5098, 'name': 'Santiphap Park'},
       'wachirabenchathat park': {'lat': 13.8098, 'lng': 100.5598, 'name': 'Wachirabenchathat Park'},
       'suan santi chaiprakarn': {'lat': 13.7598, 'lng': 100.4898, 'name': 'Suan Santi Chaiprakarn'},
@@ -690,17 +689,17 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'emporium': {'lat': 13.7298, 'lng': 100.5698, 'name': 'Emporium'},
       'emquartier': {'lat': 13.7298, 'lng': 100.5698, 'name': 'EmQuartier'},
       'benjasiri park': {'lat': 13.7298, 'lng': 100.5698, 'name': 'Benjasiri Park'},
-      'terminal 21': {'lat': 13.7378, 'lng': 100.5601, 'name': 'Terminal 21'},
+      // Terminal 21 already listed in Sukhumvit landmarks
       'exchange tower': {'lat': 13.7378, 'lng': 100.5601, 'name': 'Exchange Tower'},
       'times square': {'lat': 13.7378, 'lng': 100.5601, 'name': 'Times Square'},
       'robinson sukhumvit': {'lat': 13.7378, 'lng': 100.5601, 'name': 'Robinson Sukhumvit'},
       'soi cowboy': {'lat': 13.7378, 'lng': 100.5601, 'name': 'Soi Cowboy'},
-      'nana plaza': {'lat': 13.7378, 'lng': 100.5601, 'name': 'Nana Plaza'},
-      'bumrungrad hospital': {'lat': 13.7467, 'lng': 100.5637, 'name': 'Bumrungrad International Hospital'},
+      // see districts section for Nana Plaza
+      // see hospitals section for Bumrungrad Hospital
       'central embassy': {'lat': 13.7448, 'lng': 100.5448, 'name': 'Central Embassy'},
       'gaysorn': {'lat': 13.7448, 'lng': 100.5398, 'name': 'Gaysorn Village'},
       'amarin plaza': {'lat': 13.7448, 'lng': 100.5348, 'name': 'Amarin Plaza'},
-      'erawan shrine': {'lat': 13.7448, 'lng': 100.5398, 'name': 'Erawan Shrine'},
+      // Erawan Shrine already listed earlier
       'big c ratchadamri': {'lat': 13.7448, 'lng': 100.5348, 'name': 'Big C Ratchadamri'},
       'central chidlom': {'lat': 13.7448, 'lng': 100.5448, 'name': 'Central Chidlom'},
       'all seasons place': {'lat': 13.7348, 'lng': 100.5448, 'name': 'All Seasons Place'},
@@ -715,10 +714,10 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'shangri la hotel': {'lat': 13.7148, 'lng': 100.5251, 'name': 'Shangri-La Hotel Bangkok'},
       'peninsula hotel': {'lat': 13.7048, 'lng': 100.5351, 'name': 'The Peninsula Bangkok'},
       'oriental hotel': {'lat': 13.7248, 'lng': 100.5151, 'name': 'Mandarin Oriental Bangkok'},
-      'royal orchid sheraton': {'lat': 13.7548, 'lng': 100.5551, 'name': 'Royal Orchid Sheraton Hotel & Towers'},
+      // Royal Orchid Sheraton already listed in riverside hotels
       'millennium hilton': {'lat': 13.7148, 'lng': 100.5051, 'name': 'Millennium Hilton Bangkok'},
       'chatrium riverside': {'lat': 13.7448, 'lng': 100.5451, 'name': 'Chatrium Hotel Riverside Bangkok'},
-      'anantara riverside': {'lat': 13.7348, 'lng': 100.5351, 'name': 'Anantara Riverside Bangkok Resort'},
+      // Anantara Riverside already listed in riverside hotels
       'avani riverside': {'lat': 13.7248, 'lng': 100.5251, 'name': 'Avani Riverside Bangkok Hotel'},
       'ramada plaza': {'lat': 13.7148, 'lng': 100.5151, 'name': 'Ramada Plaza Bangkok Menam Riverside'},
       
@@ -947,16 +946,16 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'wat thong nopphakhun': {'lat': 13.7698, 'lng': 100.4798, 'name': 'Wat Thong Nopphakhun'},
       
       // Local Parks & Green Spaces
-      'benjakiti park': {'lat': 13.7298, 'lng': 100.5698, 'name': 'Benjakiti Park'},
-      'benchasiri park': {'lat': 13.7298, 'lng': 100.5698, 'name': 'Benchasiri Park'},
-      'lumpini park': {'lat': 13.7298, 'lng': 100.5398, 'name': 'Lumpini Park'},
-      'chuvit garden': {'lat': 13.7398, 'lng': 100.5598, 'name': 'Chuvit Garden'},
-      'romaneenart park': {'lat': 13.7398, 'lng': 100.5698, 'name': 'Romaneenart Park'},
-      'santiphap park': {'lat': 13.7798, 'lng': 100.5098, 'name': 'Santiphap Park'},
-      'suan santi chaiprakarn': {'lat': 13.7598, 'lng': 100.4898, 'name': 'Suan Santi Chaiprakarn'},
+      // Benjakiti Park already listed earlier
+      // Benchasiri Park already listed earlier
+      // Lumpini Park already listed earlier
+      // Chuvit Garden already listed earlier
+      // Romaneenart Park already listed earlier
+      // Santiphap Park already listed earlier
+      // Suan Santi Chaiprakarn already listed earlier
       'saranrom park': {'lat': 13.7498, 'lng': 100.4998, 'name': 'Saranrom Park'},
-      'suan rot fai': {'lat': 13.8098, 'lng': 100.5598, 'name': 'Suan Rot Fai (Chatuchak Park)'},
-      'king rama ix park': {'lat': 13.6898, 'lng': 100.6398, 'name': 'King Rama IX Park'},
+      // Suan Rot Fai already listed earlier
+      // King Rama IX Park already listed earlier
       
       // Local Internet Cafes & Co-working Spaces
       'hubba to': {'lat': 13.7298, 'lng': 100.5698, 'name': 'Hubba-TO Co-working Space'},
@@ -969,7 +968,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'dojo bali': {'lat': 13.7298, 'lng': 100.5698, 'name': 'Dojo Bali Co-working'},
       
       // Khon Kaen University
-      'Khon Kaen University': {'lat': 16.4419, 'lng': 102.8236},
+      // Khon Kaen University main campus already listed earlier
       'KKU': {'lat': 16.4419, 'lng': 102.8236},
       'Khon Kaen University Faculty of Medicine': {'lat': 16.4419, 'lng': 102.8236},
       'Khon Kaen University Faculty of Engineering': {'lat': 16.4419, 'lng': 102.8236},
@@ -1029,7 +1028,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'mbk': {'lat': 13.7441, 'lng': 100.5300, 'name': 'MBK Center'},
       'terminal 21': {'lat': 13.7378, 'lng': 100.5601, 'name': 'Terminal 21'},
       'central world': {'lat': 13.7472, 'lng': 100.5398, 'name': 'Central World'},
-      'emquartier': {'lat': 13.7308, 'lng': 100.5698, 'name': 'EmQuartier'},
+      // EmQuartier already listed in Sukhumvit landmarks
       'iconsiam': {'lat': 13.7267, 'lng': 100.5101, 'name': 'ICONSIAM'},
       'siam center': {'lat': 13.7460, 'lng': 100.5348, 'name': 'Siam Center'},
       'siam discovery': {'lat': 13.7460, 'lng': 100.5348, 'name': 'Siam Discovery'},
@@ -1060,15 +1059,15 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'wat rong khun': {'lat': 19.8242, 'lng': 99.7634, 'name': 'Wat Rong Khun (White Temple)'},
       
       // Markets & Street Food
-      'chatuchak weekend market': {'lat': 13.7998, 'lng': 100.5501, 'name': 'Chatuchak Weekend Market'},
+      // Chatuchak Weekend Market already listed earlier
       'damnoen saduak floating market': {'lat': 13.5225, 'lng': 100.1075, 'name': 'Damnoen Saduak Floating Market'},
       'amphawa floating market': {'lat': 13.4198, 'lng': 99.9598, 'name': 'Amphawa Floating Market'},
       'maeklong railway market': {'lat': 13.4198, 'lng': 99.9598, 'name': 'Maeklong Railway Market'},
-      'saphan phut night market': {'lat': 13.7437, 'lng': 100.5065, 'name': 'Saphan Phut Night Market'},
-      'huai khwang night market': {'lat': 13.7798, 'lng': 100.5801, 'name': 'Huai Khwang Night Market'},
-      'wang thonglang market': {'lat': 13.7998, 'lng': 100.6201, 'name': 'Wang Thonglang Market'},
-      'lat mayom floating market': {'lat': 13.8198, 'lng': 100.4801, 'name': 'Lat Mayom Floating Market'},
-      'khlong toei market': {'lat': 13.7198, 'lng': 100.5401, 'name': 'Khlong Toei Fresh Market'},
+      // Saphan Phut Night Market already listed earlier
+      // Huai Khwang Night Market already listed earlier
+      // Wang Thonglang Market already listed earlier
+      // Lat Mayom Floating Market already listed earlier
+      // Khlong Toei Market already listed earlier
       
       // Transportation Hubs
       'suvarnabhumi airport': {'lat': 13.6900, 'lng': 100.7501, 'name': 'Suvarnabhumi Airport (BKK)'},
@@ -1101,9 +1100,9 @@ class _MainMapScreenState extends State<MainMapScreen> {
       // Hotels & Accommodations
       'mandarin oriental': {'lat': 13.7248, 'lng': 100.5151, 'name': 'Mandarin Oriental Bangkok'},
       'shangri la': {'lat': 13.7248, 'lng': 100.5151, 'name': 'Shangri-La Hotel Bangkok'},
-      'peninsula bangkok': {'lat': 13.7248, 'lng': 100.5151, 'name': 'The Peninsula Bangkok'},
+      // The Peninsula Bangkok already listed earlier
       'lebua': {'lat': 13.7248, 'lng': 100.5151, 'name': 'Lebua at State Tower'},
-      'centara grand': {'lat': 13.7472, 'lng': 100.5398, 'name': 'Centara Grand at CentralWorld'},
+      // Centara Grand already listed earlier
       'intercontinental': {'lat': 13.7308, 'lng': 100.5698, 'name': 'InterContinental Bangkok'},
       
       // Islands & Beaches
@@ -1174,6 +1173,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
 
   Future<void> _loadNearbyIncidents() async {
     if (_radarCenter == null || !_radarConfirmed) return;
+    final messenger = ScaffoldMessenger.of(context);
     
     try {
       final QuerySnapshot snapshot = await FirebaseFirestore.instance
@@ -1211,27 +1211,25 @@ class _MainMapScreenState extends State<MainMapScreen> {
       });
       
       // Show confirmation message
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars(); // Clear any existing snackbars first
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Found ${incidents.length} incidents within ${_radarRadius.toStringAsFixed(1)} km radius'),
-            backgroundColor: Colors.teal,
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.fixed, // Prevent floating behavior
-          ),
-        );
-      }
+      if (!mounted) return;
+      messenger.clearSnackBars(); // Clear any existing snackbars first
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Found ${incidents.length} incidents within ${_radarRadius.toStringAsFixed(1)} km radius'),
+          backgroundColor: Colors.teal,
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.fixed, // Prevent floating behavior
+        ),
+      );
     } catch (e) {
-      print('Error loading incidents: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint('Error loading incidents: $e');
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
   
@@ -1272,7 +1270,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
       final querySnapshot = await _firestore
           .collection('incidents')
           .where('title', isGreaterThanOrEqualTo: query)
-          .where('title', isLessThanOrEqualTo: query + '\uf8ff')
+          .where('title', isLessThanOrEqualTo: '$query\uf8ff')
           .limit(10)
           .get();
 
@@ -1288,17 +1286,18 @@ class _MainMapScreenState extends State<MainMapScreen> {
         };
       }).toList();
     } catch (e) {
-      print('Error searching incidents: $e');
+      debugPrint('Error searching incidents: $e');
       return [];
     }
   }
 
 
-  void _listenToUnreadMessages() {
+  Future<void> _listenToUnreadMessages() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    _firestore
+    await _unreadSubscription?.cancel();
+    _unreadSubscription = _firestore
         .collection('chats')
         .where('participants', arrayContains: user.uid)
         .snapshots()
@@ -1328,7 +1327,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
             return messageData['senderId'] != user.uid;
           });
         } catch (e) {
-          print('Error checking unread messages for chat $chatId: $e');
+          debugPrint('Error checking unread messages for chat $chatId: $e');
           return false;
         }
       }).toList();
@@ -1376,7 +1375,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
           ),
         ),
         centerTitle: false,
-        backgroundColor: isDark ? Colors.black.withOpacity(0.9) : Colors.white,
+        backgroundColor: isDark ? Colors.black.withValues(alpha: 0.9) : Colors.white,
         elevation: isDark ? 0 : 1,
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -1384,8 +1383,8 @@ class _MainMapScreenState extends State<MainMapScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: isDark ? [
-                Colors.black.withOpacity(0.9),
-                Colors.grey[900]!.withOpacity(0.9),
+                Colors.black.withValues(alpha: 0.9),
+                Colors.grey[900]!.withValues(alpha: 0.9),
               ] : [
                 Colors.white,
                 Colors.grey[50]!,
@@ -1464,18 +1463,18 @@ class _MainMapScreenState extends State<MainMapScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: isDark ? [
-              Colors.grey[900]!.withOpacity(0.95),
-              Colors.black.withOpacity(0.98),
+              Colors.grey[900]!.withValues(alpha: 0.95),
+              Colors.black.withValues(alpha: 0.98),
             ] : [
-              Colors.white.withOpacity(0.95),
-              Colors.grey[100]!.withOpacity(0.98),
+              Colors.white.withValues(alpha: 0.95),
+              Colors.grey[100]!.withValues(alpha: 0.98),
             ],
           ),
           boxShadow: [
             BoxShadow(
               color: isDark 
-                ? Colors.tealAccent.withOpacity(0.1)
-                : Colors.teal.withOpacity(0.1),
+                ? Colors.tealAccent.withValues(alpha: 0.1)
+                : Colors.teal.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -1508,7 +1507,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: currentIndex == 0 
-                        ? (isDark ? Colors.tealAccent.withOpacity(0.2) : Colors.teal.withOpacity(0.2))
+                        ? (isDark ? Colors.tealAccent.withValues(alpha: 0.2) : Colors.teal.withValues(alpha: 0.2))
                         : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1552,7 +1551,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: currentIndex == 2 
-                    ? (isDark ? Colors.tealAccent.withOpacity(0.2) : Colors.teal.withOpacity(0.2))
+                    ? (isDark ? Colors.tealAccent.withValues(alpha: 0.2) : Colors.teal.withValues(alpha: 0.2))
                     : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1566,7 +1565,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: currentIndex == 3 
-                    ? (isDark ? Colors.tealAccent.withOpacity(0.2) : Colors.teal.withOpacity(0.2))
+                    ? (isDark ? Colors.tealAccent.withValues(alpha: 0.2) : Colors.teal.withValues(alpha: 0.2))
                     : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1627,7 +1626,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -1739,6 +1738,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildRadarControl(bool isDark) {
     return Container(
       width: 200,
@@ -1748,7 +1748,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1803,7 +1803,6 @@ class _MainMapScreenState extends State<MainMapScreen> {
       // Simple hit test - in a real app you'd calculate the actual marker positions
       setState(() {
         _selectedIncident = incident['data'];
-        _selectedIncidentId = incident['id'];
         _showIncidentPanel = true;
       });
       break; // Just select the first incident for demo
@@ -1818,7 +1817,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1912,7 +1911,6 @@ class _MainMapScreenState extends State<MainMapScreen> {
             onIncidentTap: (incident) {
               setState(() {
                 _selectedIncident = incident['data'];
-                _selectedIncidentId = incident['id'];
                 _showIncidentPanel = true;
               });
             },
@@ -1979,7 +1977,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 15,
                 offset: const Offset(0, -5),
               ),
@@ -2198,7 +2196,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
           _showIncidentPanel = targetHeight > 100;
         });
       }
-    };
+    }
     
     animate();
   }
@@ -2211,7 +2209,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2229,8 +2227,8 @@ class _MainMapScreenState extends State<MainMapScreen> {
               height: 40,
               decoration: BoxDecoration(
                 color: isPlace ? 
-                  (result['source'] == 'api' ? Colors.green.withOpacity(0.1) : Colors.blue.withOpacity(0.1)) : 
-                  Colors.orange.withOpacity(0.1),
+                  (result['source'] == 'api' ? Colors.green.withValues(alpha: 0.1) : Colors.blue.withValues(alpha: 0.1)) : 
+                  Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -2300,7 +2298,8 @@ class _MainMapScreenState extends State<MainMapScreen> {
               FocusScope.of(context).unfocus();
               
               // Show confirmation
-              ScaffoldMessenger.of(context).showSnackBar(
+              final messenger = ScaffoldMessenger.of(context);
+              messenger.showSnackBar(
                 SnackBar(
                   content: Text('Moved to ${result['title']}'),
                   duration: const Duration(seconds: 2),
@@ -2376,19 +2375,19 @@ class _MainMapScreenState extends State<MainMapScreen> {
                               gradient: LinearGradient(
                                 colors: [
                                   _getCategoryColor(data['category']),
-                                  _getCategoryColor(data['category']).withOpacity(0.8),
+                                  _getCategoryColor(data['category']).withValues(alpha: 0.8),
                                 ],
                               ),
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: _getCategoryColor(data['category']).withOpacity(0.4),
+                                  color: _getCategoryColor(data['category']).withValues(alpha: 0.4),
                                   blurRadius: 8,
                                   spreadRadius: 2,
                                 ),
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withValues(alpha: 0.3),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 ),
@@ -2462,7 +2461,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.green.withOpacity(0.5),
+                              color: Colors.green.withValues(alpha: 0.5),
                               blurRadius: 8,
                               spreadRadius: 2,
                             ),
@@ -2507,22 +2506,22 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isDark 
-                    ? Colors.tealAccent.withOpacity(0.3)
-                    : Colors.teal.withOpacity(0.3),
+                    ? Colors.tealAccent.withValues(alpha: 0.3)
+                    : Colors.teal.withValues(alpha: 0.3),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: isDark 
-                      ? Colors.black.withOpacity(0.4)
-                      : Colors.grey.withOpacity(0.2),
+                      ? Colors.black.withValues(alpha: 0.4)
+                      : Colors.grey.withValues(alpha: 0.2),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
                   BoxShadow(
                     color: isDark 
-                      ? Colors.tealAccent.withOpacity(0.1)
-                      : Colors.teal.withOpacity(0.1),
+                      ? Colors.tealAccent.withValues(alpha: 0.1)
+                      : Colors.teal.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -2574,7 +2573,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                             borderRadius: BorderRadius.circular(25),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.red.withOpacity(0.3),
+                                color: Colors.red.withValues(alpha: 0.3),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -2593,17 +2592,16 @@ class _MainMapScreenState extends State<MainMapScreen> {
                               ),
                             ),
                             onPressed: () async {
+                              final navigator = Navigator.of(context);
                               final user = FirebaseAuth.instance.currentUser;
                               if (user == null) {
-                                await Navigator.push(
-                                  context,
+                                await navigator.push(
                                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                                 );
                                 if (FirebaseAuth.instance.currentUser == null) return;
                               }
                               
-                              final result = await Navigator.push(
-                                context,
+                              final result = await navigator.push(
                                 MaterialPageRoute(
                                   builder: (_) => IncidentFormScreen(
                                     latitude: _selectedLocation?.latitude,
@@ -2632,7 +2630,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                             borderRadius: BorderRadius.circular(25),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.teal.withOpacity(0.3),
+                                color: Colors.teal.withValues(alpha: 0.3),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -2661,7 +2659,8 @@ class _MainMapScreenState extends State<MainMapScreen> {
                               });
                               
                               // Show feedback message
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              final messenger = ScaffoldMessenger.of(context);
+                              messenger.showSnackBar(
                                 const SnackBar(
                                   content: Text('Radar center point set! Adjust radius and press OK to search.'),
                                   backgroundColor: Colors.teal,
@@ -2686,7 +2685,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                         borderRadius: BorderRadius.circular(25),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
+                            color: Colors.grey.withValues(alpha: 0.2),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -2747,6 +2746,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildChatList() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -2755,6 +2755,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
     return const ChatListScreen();
   }
 
+  // ignore: unused_element
   Widget _buildProfile() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -2831,32 +2832,32 @@ class _EnhancedZoomButtonState extends State<_EnhancedZoomButton>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: isDark ? [
-                  Colors.black.withOpacity(0.8),
-                  Colors.grey[800]!.withOpacity(0.9),
+                  Colors.black.withValues(alpha: 0.8),
+                  Colors.grey[800]!.withValues(alpha: 0.9),
                 ] : [
-                  Colors.white.withOpacity(0.9),
-                  Colors.grey[100]!.withOpacity(0.9),
+                  Colors.white.withValues(alpha: 0.9),
+                  Colors.grey[100]!.withValues(alpha: 0.9),
                 ],
               ),
               shape: BoxShape.circle,
               border: Border.all(
                 color: isDark 
-                  ? Colors.tealAccent.withOpacity(0.3)
-                  : Colors.teal.withOpacity(0.3),
+                  ? Colors.tealAccent.withValues(alpha: 0.3)
+                  : Colors.teal.withValues(alpha: 0.3),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
                   color: isDark 
-                    ? Colors.black.withOpacity(0.4)
-                    : Colors.grey.withOpacity(0.2),
+                    ? Colors.black.withValues(alpha: 0.4)
+                    : Colors.grey.withValues(alpha: 0.2),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
                 BoxShadow(
                   color: isDark 
-                    ? Colors.tealAccent.withOpacity(0.1)
-                    : Colors.teal.withOpacity(0.1),
+                    ? Colors.tealAccent.withValues(alpha: 0.1)
+                    : Colors.teal.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 1),
                 ),
@@ -2904,7 +2905,7 @@ class RadarPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.tealAccent.withOpacity(0.3)
+      ..color = Colors.tealAccent.withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
@@ -2943,5 +2944,3 @@ class RadarPainter extends CustomPainter {
   @override
   bool hitTest(Offset position) => true;
 }
-
-

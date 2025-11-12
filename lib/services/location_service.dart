@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,8 +13,6 @@ class LocationService {
   // Configuration - set to false to disable API calls temporarily
   static const bool _enableAPISearch = false;
   
-  // Debouncing
-  static Timer? _debounceTimer;
   static String _lastQuery = '';
   static List<Map<String, dynamic>> _lastResults = [];
 
@@ -91,12 +90,12 @@ class LocationService {
         
         return results;
       } else {
-        print('Nominatim API request failed with status: ${response.statusCode}');
+        debugPrint('Nominatim API request failed with status: ${response.statusCode}');
       }
     } on TimeoutException {
-      print('Nominatim API timeout - using cached/static results only');
+      debugPrint('Nominatim API timeout - using cached/static results only');
     } catch (e) {
-      print('Error searching places from Nominatim API: $e');
+      debugPrint('Error searching places from Nominatim API: $e');
     }
     
     return [];
@@ -133,7 +132,7 @@ class LocationService {
       };
       await prefs.setString(cacheKey, json.encode(cacheData));
     } catch (e) {
-      print('Error caching results: $e');
+      debugPrint('Error caching results: $e');
     }
   }
   
@@ -158,7 +157,7 @@ class LocationService {
         }
       }
     } catch (e) {
-      print('Error reading cached results: $e');
+      debugPrint('Error reading cached results: $e');
     }
     
     return [];
@@ -183,7 +182,7 @@ class LocationService {
         }
       }
     } catch (e) {
-      print('Error clearing expired cache: $e');
+      debugPrint('Error clearing expired cache: $e');
     }
   }
   

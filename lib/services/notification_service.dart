@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 import 'dart:io';
+import '../config/app_config.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
@@ -35,9 +38,6 @@ class NotificationService {
     
     // Request permissions
     await _requestPermissions();
-    
-    // Setup Firebase messaging
-    await _setupFirebaseMessaging();
   }
   
   static Future<void> _requestPermissions() async {
@@ -114,7 +114,7 @@ class NotificationService {
     final chatId = message.data['chatId'];
     if (chatId != null) {
       // TODO: Navigate to specific chat screen
-      print('Notification tapped for chat: $chatId');
+      debugPrint('Notification tapped for chat: $chatId');
     }
   }
   
@@ -155,10 +155,10 @@ class NotificationService {
       enableVibration: true,
       playSound: true,
       icon: '@mipmap/ic_launcher',
-      color: const Color(0xFF00BCD4), // Teal color
+      color: Color(0xFF00BCD4), // Teal color
     );
     
-    const iosDetails = DarwinNotificationDetails(
+    final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
@@ -166,7 +166,7 @@ class NotificationService {
       threadIdentifier: 'chat_thread',
     );
     
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
@@ -185,7 +185,7 @@ class NotificationService {
   
   static void _navigateToChat(String chatId) {
     // This will be implemented in the main app
-    print('Navigate to chat: $chatId');
+    debugPrint('Navigate to chat: $chatId');
   }
   
   static Future<void> sendChatNotification({
@@ -202,28 +202,71 @@ class NotificationService {
     
     final fcmToken = recipientDoc.data()?['fcmToken'] as String?;
     
-    if (fcmToken != null) {
-      // Send local notification for immediate display
-      await showLocalNotification(
-        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        title: senderName,
-        body: message,
-        payload: chatId,
-      );
-      
-      // Also store notification data in Firestore for background processing
-      await FirebaseFirestore.instance
-          .collection('notifications')
-          .add({
-        'recipientId': recipientId,
-        'senderId': FirebaseAuth.instance.currentUser?.uid,
-        'senderName': senderName,
-        'message': message,
-        'chatId': chatId,
-        'timestamp': FieldValue.serverTimestamp(),
-        'read': false,
-        'fcmToken': fcmToken,
-      });
+    if (fcmToken == null || fcmToken.isEmpty) {
+      debugPrint('No FCM token for user $recipientId, skip push notification');
+      return;
+    }
+
+    // Store notification data for auditing/inbox purposes
+    await FirebaseFirestore.instance.collection('notifications').add({
+      'recipientId': recipientId,
+      'senderId': FirebaseAuth.instance.currentUser?.uid,
+      'senderName': senderName,
+      'message': message,
+      'chatId': chatId,
+      'timestamp': FieldValue.serverTimestamp(),
+      'read': false,
+      'fcmToken': fcmToken,
+    });
+
+    await _sendPushMessage(
+      token: fcmToken,
+      title: senderName,
+      body: message,
+      chatId: chatId,
+    );
+  }
+
+  static Future<void> _sendPushMessage({
+    required String token,
+    required String title,
+    required String body,
+    required String chatId,
+  }) async {
+    final serverKey = AppConfig.fcmServerKey;
+    if (serverKey.isEmpty) {
+      debugPrint('FCM server key missing. Unable to send push notification.');
+      return;
+    }
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('https://fcm.googleapis.com/fcm/send'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'key=$serverKey',
+            },
+            body: jsonEncode({
+              'to': token,
+              'notification': {
+                'title': title,
+                'body': body.isEmpty ? 'You have a new message' : body,
+                'sound': 'default',
+              },
+              'data': {
+                'chatId': chatId,
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint('FCM push failed (${response.statusCode}): ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error sending FCM push: $e');
     }
   }
 }
@@ -231,5 +274,5 @@ class NotificationService {
 // Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> _handleBackgroundMessage(RemoteMessage message) async {
-  print('Handling background message: ${message.messageId}');
+  debugPrint('Handling background message: ${message.messageId}');
 }

@@ -36,6 +36,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
     setState(() {
       _isLoadingLocation = true;
     });
+    final messenger = ScaffoldMessenger.of(context);
 
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -60,11 +61,10 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
         _currentPosition = position;
       });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting location: $e')),
-        );
-      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error getting location: $e')),
+      );
     } finally {
       setState(() {
         _isLoadingLocation = false;
@@ -86,22 +86,10 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
     }
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return Colors.orange;
-      case 'in_progress':
-        return Colors.blue;
-      case 'completed':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
-
   Future<void> _updateIncidentStatus(String incidentId, String newStatus, {String? fixerImage, String? fixerDetails}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+    final messenger = ScaffoldMessenger.of(context);
 
     try {
       Map<String, dynamic> updateData = {
@@ -118,17 +106,15 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
 
       await _firestore.collection('incidents').doc(incidentId).update(updateData);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('สถานะอัปเดตเป็น${_getStatusText(newStatus)}แล้ว')),
-        );
-      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('สถานะอัปเดตเป็น${_getStatusText(newStatus)}แล้ว')),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating status: $e')),
-        );
-      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error updating status: $e')),
+      );
     }
   }
 
@@ -191,8 +177,10 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
                 if (detailsController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     const SnackBar(content: Text('Please enter repair details')),
                   );
                   return;
@@ -208,7 +196,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                   );
                 }
 
-                Navigator.pop(context);
+                navigator.pop();
                 await _updateIncidentStatus(
                   incidentId, 
                   'in_progress',
@@ -290,7 +278,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
               ),
             ),
           ),
-          backgroundColor: isDark ? Colors.black.withOpacity(0.9) : Colors.white,
+          backgroundColor: isDark ? Colors.black.withValues(alpha: 0.9) : Colors.white,
           elevation: 0,
           automaticallyImplyLeading: false,
           flexibleSpace: Container(
@@ -299,8 +287,8 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: isDark ? [
-                  Colors.black.withOpacity(0.9),
-                  Colors.grey[900]!.withOpacity(0.9),
+                  Colors.black.withValues(alpha: 0.9),
+                  Colors.grey[900]!.withValues(alpha: 0.9),
                 ] : [
                   Colors.white,
                   Colors.grey[50]!,
@@ -489,7 +477,7 @@ class _IncidentCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Card(
         elevation: 8,
-        shadowColor: Colors.tealAccent.withOpacity(0.2),
+        shadowColor: Colors.tealAccent.withValues(alpha: 0.2),
         color: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -501,7 +489,7 @@ class _IncidentCard extends StatelessWidget {
               end: Alignment.bottomRight,
               colors: isDark ? [
                 const Color(0xFF2B2B2B),
-                Colors.grey[800]!.withOpacity(0.9),
+                Colors.grey[800]!.withValues(alpha: 0.9),
               ] : [
                 Colors.white,
                 Colors.grey[50]!,
@@ -509,7 +497,7 @@ class _IncidentCard extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: _getStatusColor(status).withOpacity(0.3),
+              color: _getStatusColor(status).withValues(alpha: 0.3),
               width: 2,
             ),
           ),
@@ -540,7 +528,7 @@ class _IncidentCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.tealAccent.withOpacity(0.2),
+                          color: Colors.tealAccent.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(

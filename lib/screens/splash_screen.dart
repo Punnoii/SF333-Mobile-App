@@ -53,7 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
       await Future.delayed(const Duration(seconds: 2)).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          print('Splash animation timed out, proceeding to next screen');
+          debugPrint('Splash animation timed out, proceeding to next screen');
         },
       );
       
@@ -64,7 +64,7 @@ class _SplashScreenState extends State<SplashScreen>
         _navigateToNextScreen();
       }
     } catch (e) {
-      print('Splash sequence error: $e');
+      debugPrint('Splash sequence error: $e');
       if (mounted) {
         _navigateToNextScreen();
       }
@@ -87,7 +87,7 @@ class _SplashScreenState extends State<SplashScreen>
         ),
       );
     } catch (e) {
-      print('Navigation error: $e');
+      debugPrint('Navigation error: $e');
       // Fallback to login screen if Firebase auth fails
       Navigator.pushReplacement(
         context,
@@ -130,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen>
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.tealAccent.withOpacity(0.3),
+                            color: Colors.tealAccent.withValues(alpha: 0.3),
                             blurRadius: 20,
                             spreadRadius: 5,
                           ),
