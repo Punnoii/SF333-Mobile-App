@@ -13,6 +13,31 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final TextEditingController emailController = TextEditingController();
   bool _isSending = false;
 
+  // Function to show error dialog
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red),
+              SizedBox(width: 8),
+              Text('เกิดข้อผิดพลาด'),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ตกลง'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     emailController.dispose();
@@ -23,9 +48,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final email = emailController.text.trim();
     
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your email address')),
-      );
+      _showErrorDialog('กรุณากรอกที่อยู่อีเมล');
+      return;
+    }
+
+    if (!RegExp(r'^[^@]+@[^\s]+\.[^\s]+$').hasMatch(email)) {
+      _showErrorDialog('รูปแบบอีเมลไม่ถูกต้อง');
       return;
     }
     
@@ -35,14 +63,41 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Reset link sent to $email')),
+      
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 8),
+                Text('ส่งลิงก์เรียบร้อย'),
+              ],
+            ),
+            content: Text('เราได้ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ $email แล้ว'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop();
+                },
+                child: const Text('ตกลง'),
+              ),
+            ],
+          );
+        },
       );
-      Navigator.of(context).pop();
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Failed to send reset link')),
-      );
+      String errorMessage = 'ไม่สามารถส่งลิงก์รีเซ็ตรหัสผ่านได้';
+      if (e.code == 'user-not-found') {
+        errorMessage = 'ไม่พบผู้ใช้งานอีเมลนี้';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'รูปแบบอีเมลไม่ถูกต้อง';
+      } else if (e.code == 'network-request-failed') {
+        errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้';
+      }
+      _showErrorDialog(errorMessage);
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
@@ -74,66 +129,65 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   children: [
                     const Center(
                       child: Text(
-                        'Change Password',
+                        'รีเซ็ตรหัสผ่าน',
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text('Email'),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('อีเมล'),
+                    ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
-                        hintText: 'you@example.com',
-                        fillColor: Colors.white.withValues(alpha: 0.05),
+                        hintText: 'กรอกที่อยู่อีเมลของคุณ',
+                        fillColor: Colors.white.withOpacity(0.05),
                         filled: true,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'We will send a password reset link to your email.',
+                      'เราจะส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลของคุณ',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.8),
+                        color: Colors.white.withOpacity(0.8),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Align(
-                      alignment: Alignment.center,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          shape: const StadiumBorder(),
-                          padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
-                        ),
-                        onPressed: _isSending ? null : _sendResetLink,
-                        child: _isSending
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Send reset link'),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: const StadiumBorder(),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
+                      onPressed: _isSending ? null : _sendResetLink,
+                      child: _isSending
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            )
+                          : const Text(
+                              'ส่งลิงก์รีเซ็ตรหัสผ่าน',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
                     ),
                   ],
-                ),
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 18,
-              child: Center(
-                child: TextButton(
-                  onPressed: _isSending ? null : _sendResetLink,
-                  child: const Text('Need help? Resend link'),
                 ),
               ),
             ),

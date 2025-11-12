@@ -18,6 +18,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
   bool agree = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  Future<void> _showDialog({
+    required String title,
+    required String message,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(icon, color: iconColor),
+              const SizedBox(width: 8),
+              Text(title),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ตกลง'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -36,137 +67,192 @@ class _RegisterScreenState extends State<RegisterScreen> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         body: SafeArea(
-          child: Stack(
+          child: Column(
             children: [
-              Positioned(
-                top: 16,
-                left: 16,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                  onPressed: () => Navigator.of(context).pop(),
+              Padding(
+                padding: const EdgeInsets.only(top: 8, right: 8),
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
                 ),
               ),
-            Center(
-              child: SingleChildScrollView(
-                child: Container(
-                  width: 320,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2B2B2B),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Center(
-                        child: Text(
-                          'Register',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-                        ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: Container(
+                      width: 320,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2B2B2B),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      const SizedBox(height: 20),
-                      const Text('Username'),
-                      TextField(controller: usernameController),
-                      const SizedBox(height: 12),
-                      const Text('Email'),
-                      TextField(controller: emailController, keyboardType: TextInputType.emailAddress),
-                      const SizedBox(height: 12),
-                      const Text('Phone number'),
-                      TextField(controller: phoneController, keyboardType: TextInputType.phone),
-                      const SizedBox(height: 12),
-                      const Text('Type of disability (not required)'),
-                      TextField(controller: disabilityController),
-                      const SizedBox(height: 12),
-                      const Text('Password'),
-                      TextField(controller: passwordController, obscureText: true),
-                      const SizedBox(height: 12),
-                      const Text('Confirm Password'),
-                      TextField(controller: confirmPasswordController, obscureText: true),
-                      const SizedBox(height: 8),
-                      Row(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Checkbox(
-                            value: agree,
-                            onChanged: (v) => setState(() => agree = v ?? false),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
+                          const Center(
+                            child: Text(
+                              'สมัครสมาชิก',
+                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                            ),
                           ),
-                          const Expanded(child: Text('Agree to terms & conditions')),
+                          const SizedBox(height: 24),
+                          const Text('ชื่อผู้ใช้'),
+                          const SizedBox(height: 8),
+                          TextField(controller: usernameController),
+                          const SizedBox(height: 16),
+                          const Text('อีเมล'),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: emailController,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text('เบอร์โทรศัพท์'),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: phoneController,
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text('ประเภทความพิการ (ไม่จำเป็นต้องกรอก)'),
+                          const SizedBox(height: 8),
+                          TextField(controller: disabilityController),
+                          const SizedBox(height: 16),
+                          const Text('รหัสผ่าน'),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: passwordController,
+                            obscureText: _obscurePassword,
+                            decoration: InputDecoration(
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _obscurePassword = !_obscurePassword),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text('ยืนยันรหัสผ่าน'),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: confirmPasswordController,
+                            obscureText: _obscureConfirmPassword,
+                            decoration: InputDecoration(
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () => setState(
+                                    () => _obscureConfirmPassword = !_obscureConfirmPassword),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: agree,
+                                onChanged: (v) => setState(() => agree = v ?? false),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              const Expanded(child: Text('ยอมรับเงื่อนไขและข้อตกลง')),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          Align(
+                            alignment: Alignment.center,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black,
+                                shape: const StadiumBorder(),
+                                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
+                              ),
+                              onPressed: agree
+                                  ? () async {
+                                      final navigator = Navigator.of(context);
+                                      if (passwordController.text != confirmPasswordController.text) {
+                                        await _showDialog(
+                                          title: 'เกิดข้อผิดพลาด',
+                                          message: 'รหัสผ่านไม่ตรงกัน',
+                                          icon: Icons.error_outline,
+                                          iconColor: Colors.red,
+                                        );
+                                        return;
+                                      }
+
+                                      try {
+                                        final credential = await FirebaseAuth.instance
+                                            .createUserWithEmailAndPassword(
+                                          email: emailController.text.trim(),
+                                          password: passwordController.text,
+                                        );
+
+                                        // Create user profile in Firestore
+                                        await FirebaseFirestore.instance
+                                            .collection('users')
+                                            .doc(credential.user!.uid)
+                                            .set({
+                                          'username': usernameController.text.trim(),
+                                          'email': emailController.text.trim(),
+                                          'phoneNumber': phoneController.text.trim(),
+                                          'disabilityType': disabilityController.text.trim(),
+                                          'createdAt': FieldValue.serverTimestamp(),
+                                          'profileImageUrl': '', // Local path will be set when user uploads image
+                                        });
+
+                                        if (!mounted) return;
+                                        await _showDialog(
+                                          title: 'สำเร็จ',
+                                          message: 'สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ',
+                                          icon: Icons.check_circle_outline,
+                                          iconColor: Colors.green,
+                                        );
+                                        if (!mounted) return;
+                                        navigator.pop();
+                                      } on FirebaseAuthException catch (e) {
+                                        if (!mounted) return;
+                                        String errorMessage = 'ไม่สามารถสมัครสมาชิกได้';
+                                        if (e.code == 'email-already-in-use') {
+                                          errorMessage = 'อีเมลนี้ถูกใช้สมัครไว้แล้ว';
+                                        } else if (e.code == 'weak-password') {
+                                          errorMessage = 'รหัสผ่านไม่ปลอดภัย กรุณาตั้งรหัสผ่านที่คาดเดายาก';
+                                        } else if (e.code == 'invalid-email') {
+                                          errorMessage = 'รูปแบบอีเมลไม่ถูกต้อง';
+                                        } else if (e.code == 'operation-not-allowed') {
+                                          errorMessage = 'ไม่สามารถเปิดใช้การสมัครสมาชิกได้ในขณะนี้';
+                                        } else if (e.code == 'network-request-failed') {
+                                          errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ต';
+                                        } else if (e.message != null && e.message!.isNotEmpty) {
+                                          errorMessage = e.message!;
+                                        }
+                                        await _showDialog(
+                                          title: 'เกิดข้อผิดพลาด',
+                                          message: errorMessage,
+                                          icon: Icons.error_outline,
+                                          iconColor: Colors.red,
+                                        );
+                                      }
+                                    }
+                                  : null,
+                              child: const Text('สมัครสมาชิก'),
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Align(
-                        alignment: Alignment.center,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                            shape: const StadiumBorder(),
-                            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
-                          ),
-                          onPressed: agree
-                              ? () async {
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  final navigator = Navigator.of(context);
-                                  if (passwordController.text != confirmPasswordController.text) {
-                                    messenger.showSnackBar(
-                                      const SnackBar(content: Text('Passwords do not match')),
-                                    );
-                                    return;
-                                  }
-                                  
-                                  try {
-                                    final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                                      email: emailController.text.trim(),
-                                      password: passwordController.text,
-                                    );
-                                    
-                                    // Create user profile in Firestore
-                                    await FirebaseFirestore.instance
-                                        .collection('users')
-                                        .doc(credential.user!.uid)
-                                        .set({
-                                      'username': usernameController.text.trim(),
-                                      'email': emailController.text.trim(),
-                                      'phoneNumber': phoneController.text.trim(),
-                                      'disabilityType': disabilityController.text.trim(),
-                                      'createdAt': FieldValue.serverTimestamp(),
-                                      'profileImageUrl': '', // Local path will be set when user uploads image
-                                    });
-                                    
-                                    if (!mounted) return;
-                                    messenger.showSnackBar(
-                                      const SnackBar(content: Text('Registered successfully. Please login.')),
-                                    );
-                                    if (!mounted) return;
-                                    navigator.pop();
-                                  } on FirebaseAuthException catch (e) {
-                                    if (!mounted) return;
-                                    messenger.showSnackBar(
-                                      SnackBar(content: Text(e.message ?? 'Register failed')),
-                                    );
-                                  }
-                                }
-                              : null,
-                          child: const Text('Register'),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 18,
-              child: Center(
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Already have an account? Login'),
-                ),
-              ),
               ),
             ],
           ),

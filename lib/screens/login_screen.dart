@@ -25,6 +25,31 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // Function to show error dialog
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red),
+              SizedBox(width: 8),
+              Text('เกิดข้อผิดพลาด'),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ตกลง'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,14 +75,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 4),
                     const Center(
                       child: Text(
-                        'Login',
+                        'เข้าสู่ระบบ',
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                       ),
                     ),
                     const SizedBox(height: 24),
                     const Align(
                       alignment: Alignment.centerLeft,
-                      child: Text('Email'),
+                      child: Text('อีเมล'),
                     ),
                     TextField(
                       controller: usernameController,
@@ -66,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     const Align(
                       alignment: Alignment.centerLeft,
-                      child: Text('Password'),
+                      child: Text('รหัสผ่าน'),
                     ),
                     TextField(
                       controller: passwordController,
@@ -98,14 +123,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               visualDensity: VisualDensity.compact,
                             ),
-                            const Text('Remember me'),
+                            const Text('จดจำฉันไว้'),
                           ],
                         ),
                         TextButton(
                           onPressed: () {
                             Navigator.pushNamed(context, ChangePasswordScreen.routeName);
                           },
-                          child: const Text('Forgot Password ?'),
+                          child: const Text('ลืมรหัสผ่าน?'),
                         ),
                       ],
                     ),
@@ -123,20 +148,54 @@ class _LoginScreenState extends State<LoginScreen> {
                           final messenger = ScaffoldMessenger.of(context);
                           final navigator = Navigator.of(context);
                           try {
-                            await FirebaseAuth.instance.signInWithEmailAndPassword(
-                              email: usernameController.text.trim(),
-                              password: passwordController.text,
-                            );
+                            // Validate email format
+                            final email = usernameController.text.trim();
+                            if (email.isEmpty) {
+                              _showErrorDialog('กรุณากรอกอีเมล');
+                              return;
+                            }
+                            if (!RegExp(r'^[^@]+@[^\s]+\.[^\s]+$').hasMatch(email)) {
+                              _showErrorDialog('รูปแบบอีเมลไม่ถูกต้อง');
+                              return;
+                            }
+                            
+                            // Validate password
+                            if (passwordController.text.isEmpty) {
+                              _showErrorDialog('กรุณากรอกรหัสผ่าน');
+                              return;
+                            }
+                            
+                            try {
+                              await FirebaseAuth.instance.signInWithEmailAndPassword(
+                                email: email,
+                                password: passwordController.text,
+                              );
+                              if (!mounted) return;
+                              navigator.pushReplacementNamed('/main');
+                            } on FirebaseAuthException catch (e) {
+                              if (!mounted) return;
+                              String errorMessage = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
+                              
+                              if (e.code == 'user-not-found') {
+                                errorMessage = 'ไม่พบผู้ใช้งานอีเมลนี้';
+                              } else if (e.code == 'wrong-password') {
+                                errorMessage = 'รหัสผ่านไม่ถูกต้อง';
+                              } else if (e.code == 'user-disabled') {
+                                errorMessage = 'บัญชีนี้ถูกระงับการใช้งาน';
+                              } else if (e.code == 'too-many-requests') {
+                                errorMessage = 'พยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณาลองใหม่ในภายหลัง';
+                              } else if (e.code == 'network-request-failed') {
+                                errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต';
+                              }
+                              
+                              _showErrorDialog(errorMessage);
+                            }
+                          } catch (e) {
                             if (!mounted) return;
-                            navigator.pushReplacementNamed('/main');
-                          } on FirebaseAuthException catch (e) {
-                            if (!mounted) return;
-                            messenger.showSnackBar(
-                              SnackBar(content: Text(e.message ?? 'Login failed')),
-                            );
+                            _showErrorDialog('เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง');
                           }
                         },
-                        child: const Text('Login'),
+                        child: const Text('เข้าสู่ระบบ'),
                       ),
                     ),
                   ],
@@ -150,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Center(
                 child: TextButton(
                   onPressed: () => Navigator.pushNamed(context, RegisterScreen.routeName),
-                  child: const Text("Don't have account? Register"),
+                  child: const Text("ยังไม่มีบัญชี? สมัครสมาชิก"),
                 ),
               ),
             )
