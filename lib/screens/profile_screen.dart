@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
+import '../services/logging_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,6 +14,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static const String _logCategory = 'ProfileScreen';
   Map<String, dynamic>? _userProfile;
 
   @override
@@ -52,7 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _userProfile = data;
         });
-        debugPrint('Loaded user profile: $_userProfile');
+        LoggingService.info('Loaded user profile: $_userProfile', category: _logCategory);
       } else if (mounted) {
         // Create user profile if it doesn't exist
         await FirebaseFirestore.instance
@@ -69,8 +71,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
         _loadUserProfile(); // Reload after creation
       }
-    } catch (e) {
-      debugPrint('Error loading profile: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error loading profile',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
     }
   }
 

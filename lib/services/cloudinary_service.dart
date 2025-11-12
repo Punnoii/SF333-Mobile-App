@@ -3,8 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../config/app_config.dart';
+import 'logging_service.dart';
 
 class CloudinaryService {
+  static const String _logCategory = 'CloudinaryService';
   static String get _cloudName => AppConfig.cloudinaryCloudName;
   static String get _uploadPreset => AppConfig.cloudinaryUploadPreset;
   static http.Client _httpClient = http.Client();
@@ -33,7 +35,10 @@ class CloudinaryService {
 
   static Future<String?> uploadProfileImage(File imageFile, String userId) async {
     if (_cloudName.isEmpty || _uploadPreset.isEmpty) {
-      debugPrint('Missing Cloudinary configuration. Check CLOUDINARY_* entries in .env');
+      LoggingService.warning(
+        'Missing Cloudinary configuration. Check CLOUDINARY_* entries in .env',
+        category: _logCategory,
+      );
       return null;
     }
 
@@ -68,13 +73,19 @@ class CloudinaryService {
           const Duration(seconds: 5),
           onTimeout: () => 'Response timeout',
         );
-        debugPrint('Cloudinary upload failed with status: ${response.statusCode}');
-        debugPrint('Response body: $responseData');
-        debugPrint('Request fields: ${request.fields}');
+        LoggingService.warning(
+          'Cloudinary upload failed (${response.statusCode}): $responseData, fields: ${request.fields}',
+          category: _logCategory,
+        );
         return null;
       }
-    } catch (e) {
-      debugPrint('Cloudinary upload error: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Cloudinary upload error',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
       return null;
     }
   }

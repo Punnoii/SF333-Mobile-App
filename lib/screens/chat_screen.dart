@@ -9,6 +9,7 @@ import 'dart:io';
 import '../services/cloudinary_service.dart';
 import '../services/theme_service.dart';
 import '../services/notification_service.dart';
+import '../services/logging_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -27,6 +28,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
+  static const String _logCategory = 'ChatScreen';
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -75,8 +77,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           .update({
         'lastRead_${currentUser.uid}': FieldValue.serverTimestamp(),
       });
-    } catch (e) {
-      debugPrint('Error marking chat as read: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error marking chat as read',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
     }
   }
 

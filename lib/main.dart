@@ -11,6 +11,7 @@ import 'screens/change_password_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'services/theme_service.dart';
 import 'services/notification_service.dart';
+import 'services/logging_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +21,10 @@ Future<void> main() async {
     await dotenv.load(fileName: ".env").timeout(
       const Duration(seconds: 5),
       onTimeout: () {
-        debugPrint('Environment loading timed out, continuing with defaults');
+        LoggingService.warning(
+          'Environment loading timed out, continuing with defaults',
+          category: 'AppBootstrap',
+        );
       },
     );
     
@@ -38,8 +42,13 @@ Future<void> main() async {
     await NotificationService.initialize();
     
     runApp(const MyApp());
-  } catch (e) {
-    debugPrint('App initialization error: $e');
+  } catch (e, stack) {
+    LoggingService.error(
+      'App initialization error',
+      error: e,
+      stackTrace: stack,
+      category: 'AppBootstrap',
+    );
     // Run app anyway with limited functionality
     runApp(const MyApp());
   }

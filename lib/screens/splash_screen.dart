@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'main_map_screen.dart';
 import 'login_screen.dart';
+import '../services/logging_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,6 +13,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> 
     with SingleTickerProviderStateMixin {
+  static const String _logCategory = 'SplashScreen';
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -53,7 +55,10 @@ class _SplashScreenState extends State<SplashScreen>
       await Future.delayed(const Duration(seconds: 2)).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          debugPrint('Splash animation timed out, proceeding to next screen');
+          LoggingService.warning(
+            'Splash animation timed out, proceeding to next screen',
+            category: _logCategory,
+          );
         },
       );
       
@@ -63,8 +68,13 @@ class _SplashScreenState extends State<SplashScreen>
       if (mounted) {
         _navigateToNextScreen();
       }
-    } catch (e) {
-      debugPrint('Splash sequence error: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Splash sequence error',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
       if (mounted) {
         _navigateToNextScreen();
       }
@@ -86,8 +96,13 @@ class _SplashScreenState extends State<SplashScreen>
           transitionDuration: const Duration(milliseconds: 500),
         ),
       );
-    } catch (e) {
-      debugPrint('Navigation error: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Navigation error',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
       // Fallback to login screen if Firebase auth fails
       Navigator.pushReplacement(
         context,

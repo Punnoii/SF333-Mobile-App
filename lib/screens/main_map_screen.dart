@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../services/location_service.dart';
+import '../services/logging_service.dart';
 import 'chat_list_screen.dart';
 import 'profile_screen.dart';
 import 'incident_detail_screen.dart';
@@ -25,6 +26,7 @@ class MainMapScreen extends StatefulWidget {
 }
 
 class _MainMapScreenState extends State<MainMapScreen> {
+  static const String _logCategory = 'MainMapScreen';
   int currentIndex = 1; // Start with Home (map) tab
   final MapController mapController = MapController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -164,7 +166,10 @@ class _MainMapScreenState extends State<MainMapScreen> {
         );
       } catch (e) {
         // Fallback to medium accuracy if high accuracy fails
-        debugPrint('High accuracy failed: $e, trying medium accuracy');
+        LoggingService.warning(
+          'High accuracy failed: $e, trying medium accuracy',
+          category: _logCategory,
+        );
         position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.medium,
           timeLimit: const Duration(seconds: 8),
@@ -280,8 +285,13 @@ class _MainMapScreenState extends State<MainMapScreen> {
     if (query.length > 3) {
       try {
         apiLocationResults = await _searchPlacesFromAPI(query);
-      } catch (e) {
-        debugPrint('API search failed, using static database only: $e');
+      } catch (e, stack) {
+        LoggingService.error(
+          'API search failed, using static database only',
+          error: e,
+          stackTrace: stack,
+          category: _logCategory,
+        );
         // Continue with static results only
       }
     }
@@ -1221,8 +1231,13 @@ class _MainMapScreenState extends State<MainMapScreen> {
           behavior: SnackBarBehavior.fixed, // Prevent floating behavior
         ),
       );
-    } catch (e) {
-      debugPrint('Error loading incidents: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error loading incidents',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(
@@ -1285,8 +1300,13 @@ class _MainMapScreenState extends State<MainMapScreen> {
           'source': 'incident',
         };
       }).toList();
-    } catch (e) {
-      debugPrint('Error searching incidents: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error searching incidents',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
       return [];
     }
   }
@@ -1326,8 +1346,13 @@ class _MainMapScreenState extends State<MainMapScreen> {
             final messageData = doc.data();
             return messageData['senderId'] != user.uid;
           });
-        } catch (e) {
-          debugPrint('Error checking unread messages for chat $chatId: $e');
+        } catch (e, stack) {
+          LoggingService.error(
+            'Error checking unread messages for chat $chatId',
+            error: e,
+            stackTrace: stack,
+            category: _logCategory,
+          );
           return false;
         }
       }).toList();

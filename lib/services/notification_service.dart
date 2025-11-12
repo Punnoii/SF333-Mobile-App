@@ -7,8 +7,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import '../config/app_config.dart';
+import 'logging_service.dart';
 
 class NotificationService {
+  static const String _logCategory = 'NotificationService';
   static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   
@@ -114,7 +116,7 @@ class NotificationService {
     final chatId = message.data['chatId'];
     if (chatId != null) {
       // TODO: Navigate to specific chat screen
-      debugPrint('Notification tapped for chat: $chatId');
+      LoggingService.info('Notification tapped for chat: $chatId', category: _logCategory);
     }
   }
   
@@ -185,7 +187,7 @@ class NotificationService {
   
   static void _navigateToChat(String chatId) {
     // This will be implemented in the main app
-    debugPrint('Navigate to chat: $chatId');
+    LoggingService.info('Navigate to chat: $chatId', category: _logCategory);
   }
   
   static Future<void> sendChatNotification({
@@ -203,7 +205,10 @@ class NotificationService {
     final fcmToken = recipientDoc.data()?['fcmToken'] as String?;
     
     if (fcmToken == null || fcmToken.isEmpty) {
-      debugPrint('No FCM token for user $recipientId, skip push notification');
+      LoggingService.warning(
+        'No FCM token for user $recipientId, skip push notification',
+        category: _logCategory,
+      );
       return;
     }
 
@@ -235,7 +240,10 @@ class NotificationService {
   }) async {
     final serverKey = AppConfig.fcmServerKey;
     if (serverKey.isEmpty) {
-      debugPrint('FCM server key missing. Unable to send push notification.');
+      LoggingService.warning(
+        'FCM server key missing. Unable to send push notification.',
+        category: _logCategory,
+      );
       return;
     }
 
@@ -263,10 +271,18 @@ class NotificationService {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        debugPrint('FCM push failed (${response.statusCode}): ${response.body}');
+        LoggingService.warning(
+          'FCM push failed (${response.statusCode}): ${response.body}',
+          category: _logCategory,
+        );
       }
-    } catch (e) {
-      debugPrint('Error sending FCM push: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error sending FCM push',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
     }
   }
 }
@@ -274,5 +290,8 @@ class NotificationService {
 // Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> _handleBackgroundMessage(RemoteMessage message) async {
-  debugPrint('Handling background message: ${message.messageId}');
+  LoggingService.info(
+    'Handling background message: ${message.messageId}',
+    category: NotificationService._logCategory,
+  );
 }

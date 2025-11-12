@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'logging_service.dart';
 
 class LocationService {
+  static const String _logCategory = 'LocationService';
   static const String _nominatimBaseUrl = 'https://nominatim.openstreetmap.org/search';
   static const Duration _timeout = Duration(seconds: 3);
   static const String _cachePrefix = 'location_cache_';
@@ -115,12 +117,23 @@ class LocationService {
         
         return results;
       } else {
-        debugPrint('Nominatim API request failed with status: ${response.statusCode}');
+        LoggingService.warning(
+          'Nominatim API request failed with status: ${response.statusCode}',
+          category: _logCategory,
+        );
       }
     } on TimeoutException {
-      debugPrint('Nominatim API timeout - using cached/static results only');
-    } catch (e) {
-      debugPrint('Error searching places from Nominatim API: $e');
+      LoggingService.warning(
+        'Nominatim API timeout - using cached/static results only',
+        category: _logCategory,
+      );
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error searching places from Nominatim API',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
     }
     
     return [];
@@ -156,8 +169,13 @@ class LocationService {
         'results': results,
       };
       await prefs.setString(cacheKey, json.encode(cacheData));
-    } catch (e) {
-      debugPrint('Error caching results: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error caching results',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
     }
   }
   
@@ -181,8 +199,13 @@ class LocationService {
           return results;
         }
       }
-    } catch (e) {
-      debugPrint('Error reading cached results: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error reading cached results',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
     }
     
     return [];
@@ -206,8 +229,13 @@ class LocationService {
           }
         }
       }
-    } catch (e) {
-      debugPrint('Error clearing expired cache: $e');
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error clearing expired cache',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
     }
   }
   
