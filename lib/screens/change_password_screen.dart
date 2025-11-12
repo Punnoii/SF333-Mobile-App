@@ -144,7 +144,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
                         hintText: 'กรอกที่อยู่อีเมลของคุณ',
-                        fillColor: Colors.white.withOpacity(0.05),
+                        fillColor: Colors.white.withValues(alpha: 0.05),
                         filled: true,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -161,7 +161,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       'เราจะส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลของคุณ',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
                     const SizedBox(height: 24),

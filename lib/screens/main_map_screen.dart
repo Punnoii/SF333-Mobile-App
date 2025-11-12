@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -44,37 +43,17 @@ class _MainMapScreenState extends State<MainMapScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _showSearchResults = false;
   List<Map<String, dynamic>> _searchResults = [];
-  
-  // Incident radar system
-  bool _showIncidentRadar = false;
-  double _radarRadius = 1.0; // km
-  List<Map<String, dynamic>> _nearbyIncidents = [];
-  bool _showIncidentPanel = false;
-  Map<String, dynamic>? _selectedIncident;
-  LatLng? _radarCenter; // Center of radar circle
-  bool _radarConfirmed = false; // Track if user confirmed the radius
-  
-  // Double-click detection
-  Timer? _tapTimer;
-  
-  // Panel drag animation variables
-  double _panelHeight = 60.0;
-  double _dragStartY = 0.0;
-  double _initialPanelHeight = 60.0;
-  bool _isDragging = false;
 
   @override
   void initState() {
     super.initState();
     _listenToUnreadMessages();
     _getCurrentLocation();
-    _loadNearbyIncidents();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _tapTimer?.cancel();
     _searchDebounceTimer?.cancel();
     _unreadSubscription?.cancel();
     super.dispose();
@@ -91,7 +70,6 @@ class _MainMapScreenState extends State<MainMapScreen> {
     });
 
     String errorDetails = '';
-    final messenger = ScaffoldMessenger.of(context);
     
     try {
       // Check location service with longer timeout
@@ -191,7 +169,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
         // Move map to current location
         if (!mounted) return;
         mapController.move(_currentCenter, 15.0);
-        messenger.showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Location found: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
             backgroundColor: Colors.green,
@@ -215,7 +193,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
           ? 'Location Error: $errorDetails' 
           : 'Location Error: ${e.toString()}';
           
-      messenger.showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$errorMessage\nUsing Bangkok default location'),
           backgroundColor: Colors.orange,
@@ -330,56 +308,19 @@ class _MainMapScreenState extends State<MainMapScreen> {
       // Universities & Higher Education
       'Chulalongkorn University': {'lat': 13.7367, 'lng': 100.5332},
       'Chulalongkorn University Main Campus': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Medicine': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Engineering': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Arts': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Science': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Commerce and Accountancy': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Political Science': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Architecture': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Communication Arts': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Education': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Psychology': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Law': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Economics': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Pharmaceutical Sciences': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Veterinary Science': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Dentistry': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Allied Health Sciences': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Nursing': {'lat': 13.7367, 'lng': 100.5332},
-      'Chulalongkorn University Faculty of Sports Science': {'lat': 13.7367, 'lng': 100.5332},
       'Chulalongkorn University Sasin Graduate Institute': {'lat': 13.7367, 'lng': 100.5332},
       
       // Silpakorn University - Multiple Campuses
-      'Silpakorn University': {'lat': 13.8167, 'lng': 100.0437},
       'Silpakorn University Wang Tha Phra Campus': {'lat': 13.8167, 'lng': 100.0437},
       'Silpakorn University Sanam Chandra Palace Campus': {'lat': 13.8167, 'lng': 100.0437},
       'Silpakorn University Phetchaburi IT Campus': {'lat': 13.1067, 'lng': 99.9437},
       'SU': {'lat': 13.8167, 'lng': 100.0437},
       
       // Thammasat University - Multiple Campuses
-      'Thammasat University': {'lat': 13.7967, 'lng': 100.3256},
       'Thammasat University Tha Prachan Campus': {'lat': 13.7567, 'lng': 100.4967},
       'Thammasat University Rangsit Campus': {'lat': 14.0697, 'lng': 100.6056},
       'Thammasat University Lampang Campus': {'lat': 18.2888, 'lng': 99.4907},
       'Thammasat University Pattaya Campus': {'lat': 12.7967, 'lng': 100.8756},
-      'Thammasat University Faculty of Law': {'lat': 13.7567, 'lng': 100.4967},
-      'Thammasat University Faculty of Political Science': {'lat': 13.7567, 'lng': 100.4967},
-      'Thammasat University Faculty of Economics': {'lat': 13.7567, 'lng': 100.4967},
-      'Thammasat University Faculty of Social Administration': {'lat': 13.7567, 'lng': 100.4967},
-      'Thammasat University Faculty of Liberal Arts': {'lat': 13.7567, 'lng': 100.4967},
-      'Thammasat University Faculty of Journalism and Mass Communication': {'lat': 13.7567, 'lng': 100.4967},
-      'Thammasat University Faculty of Sociology and Anthropology': {'lat': 13.7567, 'lng': 100.4967},
-      'Thammasat University Faculty of Medicine': {'lat': 14.0697, 'lng': 100.6056},
-      'Thammasat University Faculty of Engineering': {'lat': 14.0697, 'lng': 100.6056},
-      'Thammasat University Faculty of Science and Technology': {'lat': 14.0697, 'lng': 100.6056},
-      'Thammasat University Faculty of Architecture and Planning': {'lat': 14.0697, 'lng': 100.6056},
-      'Thammasat University Faculty of Commerce and Accountancy': {'lat': 14.0697, 'lng': 100.6056},
-      'Thammasat University Faculty of Allied Health Sciences': {'lat': 14.0697, 'lng': 100.6056},
-      'Thammasat University Faculty of Nursing': {'lat': 14.0697, 'lng': 100.6056},
-      'Thammasat University Faculty of Public Health': {'lat': 14.0697, 'lng': 100.6056},
-      'Thammasat University Faculty of Dentistry': {'lat': 14.0697, 'lng': 100.6056},
-      'Thammasat University Faculty of Fine and Applied Arts': {'lat': 14.0697, 'lng': 100.6056},
       'Thammasat University Sirindhorn International Institute of Technology': {'lat': 14.0697, 'lng': 100.6056},
       
       // Kasetsart University - Multiple Campuses
@@ -389,46 +330,12 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'Kasetsart University Sriracha Campus': {'lat': 13.1756, 'lng': 100.9256},
       'Kasetsart University Sakon Nakhon Campus': {'lat': 17.1556, 'lng': 104.1356},
       'Kasetsart University Chalermphrakiat Sakon Nakhon Province Campus': {'lat': 17.1556, 'lng': 104.1356},
-      'Kasetsart University Faculty of Agriculture': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Engineering': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Science': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Forestry': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Fisheries': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Agro-Industry': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Veterinary Medicine': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Economics': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Business Administration': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Education': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Social Sciences': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Humanities': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Liberal Arts and Science': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Architecture': {'lat': 13.8462, 'lng': 100.5717},
-      'Kasetsart University Faculty of Environment': {'lat': 13.8462, 'lng': 100.5717},
       
       // Mahidol University - Multiple Campuses
-      'Mahidol University': {'lat': 13.7946, 'lng': 100.3256},
       'Mahidol University Salaya Campus': {'lat': 13.7946, 'lng': 100.3256},
       'Mahidol University Phayathai Campus': {'lat': 13.7656, 'lng': 100.5356},
       'Mahidol University Amnatcharoen Campus': {'lat': 15.8656, 'lng': 104.6256},
       'Mahidol University Kanchanaburi Campus': {'lat': 14.0256, 'lng': 99.5356},
-      'Mahidol University Faculty of Medicine Siriraj Hospital': {'lat': 13.7656, 'lng': 100.4756},
-      'Mahidol University Faculty of Medicine Ramathibodi Hospital': {'lat': 13.7656, 'lng': 100.5356},
-      'Mahidol University Faculty of Tropical Medicine': {'lat': 13.7656, 'lng': 100.4756},
-      'Mahidol University Faculty of Dentistry': {'lat': 13.7656, 'lng': 100.4756},
-      'Mahidol University Faculty of Pharmacy': {'lat': 13.7656, 'lng': 100.4756},
-      'Mahidol University Faculty of Medical Technology': {'lat': 13.7656, 'lng': 100.4756},
-      'Mahidol University Faculty of Nursing': {'lat': 13.7656, 'lng': 100.4756},
-      'Mahidol University Faculty of Public Health': {'lat': 13.7656, 'lng': 100.4756},
-      'Mahidol University Faculty of Veterinary Science': {'lat': 13.7946, 'lng': 100.3256},
-      'Mahidol University Faculty of Science': {'lat': 13.7946, 'lng': 100.3256},
-      'Mahidol University Faculty of Engineering': {'lat': 13.7946, 'lng': 100.3256},
-      'Mahidol University Faculty of Environment and Resource Studies': {'lat': 13.7946, 'lng': 100.3256},
-      'Mahidol University Faculty of Social Sciences and Humanities': {'lat': 13.7946, 'lng': 100.3256},
-      'Mahidol University Faculty of Graduate Studies': {'lat': 13.7946, 'lng': 100.3256},
-      'Mahidol University Faculty of Liberal Arts': {'lat': 13.7946, 'lng': 100.3256},
-      'Mahidol University Faculty of Music': {'lat': 13.7946, 'lng': 100.3256},
-      'Mahidol University Faculty of Physical Therapy': {'lat': 13.7946, 'lng': 100.3256},
-      'Mahidol University Faculty of Information and Communication Technology': {'lat': 13.7946, 'lng': 100.3256},
       'Mahidol University International College': {'lat': 13.7946, 'lng': 100.3256},
       'Mahidol University College of Management': {'lat': 13.7946, 'lng': 100.3256},
       'assumption university': {'lat': 13.6167, 'lng': 100.6037, 'name': 'Assumption University'},
@@ -992,8 +899,6 @@ class _MainMapScreenState extends State<MainMapScreen> {
       'Naresuan University Faculty of Science': {'lat': 16.7419, 'lng': 100.1936},
       
       // Burapha University - Multiple Campuses
-      'Burapha University': {'lat': 13.2781, 'lng': 100.9298},
-      'BUU': {'lat': 13.2781, 'lng': 100.9298},
       'Burapha University Bangsaen Campus': {'lat': 13.2781, 'lng': 100.9298},
       'Burapha University Chanthaburi Campus': {'lat': 12.6103, 'lng': 102.1038},
       'Burapha University Sakaeo Campus': {'lat': 13.8239, 'lng': 102.0697},
@@ -1181,90 +1086,6 @@ class _MainMapScreenState extends State<MainMapScreen> {
     return results;
   }
 
-  Future<void> _loadNearbyIncidents() async {
-    if (_radarCenter == null || !_radarConfirmed) return;
-    final messenger = ScaffoldMessenger.of(context);
-    
-    try {
-      final QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('incidents')
-          .get();
-      
-      final incidents = <Map<String, dynamic>>[];
-      
-      for (final doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final lat = data['latitude'] as double?;
-        final lng = data['longitude'] as double?;
-        
-        if (lat != null && lng != null) {
-          final distance = _calculateDistance(
-            _radarCenter!.latitude,
-            _radarCenter!.longitude,
-            lat,
-            lng,
-          );
-          
-          if (distance <= _radarRadius) {
-            incidents.add({
-              'id': doc.id,
-              'data': data,
-              'distance': distance,
-            });
-          }
-        }
-      }
-      
-      setState(() {
-        _nearbyIncidents = incidents;
-        _showIncidentPanel = incidents.isNotEmpty;
-      });
-      
-      // Show confirmation message
-      if (!mounted) return;
-      messenger.clearSnackBars(); // Clear any existing snackbars first
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Found ${incidents.length} incidents within ${_radarRadius.toStringAsFixed(1)} km radius'),
-          backgroundColor: Colors.teal,
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.fixed, // Prevent floating behavior
-        ),
-      );
-    } catch (e, stack) {
-      LoggingService.error(
-        'Error loading incidents',
-        error: e,
-        stackTrace: stack,
-        category: _logCategory,
-      );
-      if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-  
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const double earthRadius = 6371;
-    double dLat = _degreesToRadians(lat2 - lat1);
-    double dLon = _degreesToRadians(lon2 - lon1);
-    
-    double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) *
-        sin(dLon / 2) * sin(dLon / 2);
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    
-    return earthRadius * c;
-  }
-  
-  double _degreesToRadians(double degrees) {
-    return degrees * (pi / 180);
-  }
-  
   void _handleMapTap(LatLng point) {
     // Single tap - show popup with pin
     setState(() {
@@ -1615,223 +1436,22 @@ class _MainMapScreenState extends State<MainMapScreen> {
       body: Stack(
         children: [
           _buildMap(),
-          // Incident radar overlay
-          if (_showIncidentRadar) _buildRadarOverlay(),
-          // Google Maps style search bar
           Positioned(
-            top: MediaQuery.of(context).padding.top + 5,
+            top: MediaQuery.of(context).padding.top + 12,
             left: 16,
             right: 16,
             child: _buildSearchBar(isDark),
           ),
-          // Search results
           if (_showSearchResults && _searchResults.isNotEmpty)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 70,
+              top: MediaQuery.of(context).padding.top + 78,
               left: 16,
-              right: 80, // Leave space for radar button
+              right: 16,
               child: _buildSearchResults(isDark),
             ),
-          // Radar control button
-          Positioned(
-            right: 16,
-            top: MediaQuery.of(context).padding.top + 70,
-            child: _buildRadarToggle(isDark),
-          ),
-          // Radar radius control
-          if (_showIncidentRadar)
-            Positioned(
-              right: 16,
-              top: MediaQuery.of(context).padding.top + 120,
-              child: Container(
-                width: 200,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[800] : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Search Radius',
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Text(
-                          '${_radarRadius.toStringAsFixed(1)} km',
-                          style: TextStyle(
-                            color: isDark ? Colors.grey[300] : Colors.grey[700],
-                            fontSize: 10,
-                          ),
-                        ),
-                        Expanded(
-                          child: Slider(
-                            value: _radarRadius,
-                            min: 0.5,
-                            max: 5.0,
-                            divisions: 9,
-                            activeColor: Colors.tealAccent,
-                            onChanged: (value) {
-                              setState(() {
-                                _radarRadius = value;
-                              });
-                              // If radar is already confirmed, update incidents with new radius
-                              if (_radarConfirmed && _radarCenter != null) {
-                                _loadNearbyIncidents();
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _radarCenter != null ? () {
-                          setState(() {
-                            _radarConfirmed = true;
-                          });
-                          _loadNearbyIncidents();
-                        } : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.tealAccent,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.search, size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              _radarConfirmed ? 'Search Again' : 'OK',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (_radarCenter == null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'Tap map and press "Set Center" to select center',
-                          style: TextStyle(
-                            color: Colors.orange,
-                            fontSize: 9,
-                            fontStyle: FontStyle.italic,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          // Incident details panel - positioned at bottom to avoid overlap
-          if (_showIncidentPanel && _selectedIncident != null)
-            Positioned(
-              bottom: 20,
-              left: 16,
-              right: 16,
-              child: _buildIncidentPanel(isDark),
-            ),
         ],
       ),
     );
-  }
-
-  // ignore: unused_element
-  Widget _buildRadarControl(bool isDark) {
-    return Container(
-      width: 200,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Radar Range',
-            style: TextStyle(
-              color: isDark ? Colors.white : Colors.black,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                '${_radarRadius.toStringAsFixed(1)} km',
-                style: TextStyle(
-                  color: isDark ? Colors.grey[300] : Colors.grey[700],
-                  fontSize: 10,
-                ),
-              ),
-              Expanded(
-                child: Slider(
-                  value: _radarRadius,
-                  min: 0.5,
-                  max: 5.0,
-                  divisions: 9,
-                  activeColor: Colors.tealAccent,
-                  onChanged: (value) {
-                    setState(() {
-                      _radarRadius = value;
-                    });
-                    _loadNearbyIncidents();
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleRadarTap(Offset position) {
-    // Handle taps on incident markers in the radar
-    for (final incident in _nearbyIncidents) {
-      // Simple hit test - in a real app you'd calculate the actual marker positions
-      setState(() {
-        _selectedIncident = incident['data'];
-        _showIncidentPanel = true;
-      });
-      break; // Just select the first incident for demo
-    }
   }
 
   Widget _buildSearchBar(bool isDark) {
@@ -1891,339 +1511,6 @@ class _MainMapScreenState extends State<MainMapScreen> {
         },
       ),
     );
-  }
-  
-  Widget _buildRadarToggle(bool isDark) {
-    return FloatingActionButton(
-      mini: true,
-      backgroundColor: _showIncidentRadar 
-          ? Colors.tealAccent 
-          : (isDark ? Colors.grey[800] : Colors.white),
-      onPressed: () {
-        setState(() {
-          _showIncidentRadar = !_showIncidentRadar;
-          if (!_showIncidentRadar) {
-            // Reset everything when turning off radar
-            _radarConfirmed = false;
-            _nearbyIncidents.clear();
-            _showIncidentPanel = false;
-            _radarCenter = null;
-          }
-        });
-      },
-      child: Icon(
-        Icons.radar,
-        color: _showIncidentRadar 
-            ? Colors.black 
-            : (isDark ? Colors.white : Colors.black),
-      ),
-    );
-  }
-  
-  Widget _buildRadarOverlay() {
-    if (_currentPosition == null) return const SizedBox.shrink();
-    
-    return Positioned.fill(
-      child: GestureDetector(
-        onTapDown: (details) {
-          _handleRadarTap(details.localPosition);
-        },
-        child: CustomPaint(
-          painter: RadarPainter(
-            center: _radarCenter ?? _currentCenter,
-            radius: _radarRadius,
-            incidents: _nearbyIncidents,
-            onIncidentTap: (incident) {
-              setState(() {
-                _selectedIncident = incident['data'];
-                _showIncidentPanel = true;
-              });
-            },
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildIncidentPanel(bool isDark) {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: GestureDetector(
-        onVerticalDragStart: (details) {
-          _dragStartY = details.globalPosition.dy;
-          _initialPanelHeight = _panelHeight;
-          setState(() {
-            _isDragging = true;
-          });
-        },
-        onVerticalDragUpdate: (details) {
-          final dragDistance = _dragStartY - details.globalPosition.dy;
-          final newHeight = (_initialPanelHeight + dragDistance).clamp(60.0, 200.0);
-          
-          setState(() {
-            _panelHeight = newHeight;
-            // Keep panel visible during drag - don't change _showIncidentPanel here
-          });
-        },
-        onVerticalDragEnd: (details) {
-          setState(() {
-            _isDragging = false;
-          });
-          
-          final velocity = details.primaryVelocity ?? 0;
-          
-          // Determine final position based on current height and velocity
-          if (velocity > 800) {
-            // Fast swipe down - minimize
-            _animatePanelTo(60.0);
-          } else if (velocity < -800) {
-            // Fast swipe up - maximize
-            _animatePanelTo(200.0);
-          } else {
-            // Slow drag - snap to nearest position based on height
-            if (_panelHeight < 130) {
-              _animatePanelTo(60.0);
-            } else {
-              _animatePanelTo(200.0);
-            }
-          }
-        },
-        child: AnimatedContainer(
-          duration: _isDragging ? Duration.zero : const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          height: _panelHeight,
-          decoration: BoxDecoration(
-            color: isDark ? Colors.grey[900] : Colors.white,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 15,
-                offset: const Offset(0, -5),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Handle bar for visual feedback
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[400],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // Minimized view (always visible)
-              Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning,
-                      color: Colors.orange,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _radarConfirmed 
-                          ? 'พบการแจ้งเหตุในรัศมี (${_nearbyIncidents.length} รายการ)'
-                          : 'กำหนดรัศมีและกดตกลงเพื่อค้นหา',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      _showIncidentPanel ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                  ],
-                ),
-              ),
-              // Expanded content (only when panel is open)
-              if (_showIncidentPanel)
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    child: !_radarConfirmed
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.touch_app,
-                                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                  size: 32,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'แตะ 2 ครั้งบนแผนที่เพื่อเลือกจุดศูนย์กลาง\nจากนั้นกำหนดรัศมีและกดตกลง',
-                                  style: TextStyle(
-                                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                    fontSize: 12,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          )
-                        : _nearbyIncidents.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.check_circle,
-                                  color: Colors.green,
-                                  size: 32,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'ไม่พบเหตุการณ์ในรัศมี ${_radarRadius.toStringAsFixed(1)} กม.',
-                                  style: TextStyle(
-                                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                    fontSize: 12,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: _nearbyIncidents.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 8),
-                            itemBuilder: (context, index) {
-                              final incident = _nearbyIncidents[index];
-                              final data = incident['data'] as Map<String, dynamic>;
-                              return Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: isDark ? Colors.grey[800] : Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: index == 0 ? Colors.tealAccent : Colors.transparent,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        color: _getCategoryColor(data['category']),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            data['title'] ?? 'เหตุการณ์',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                              color: isDark ? Colors.white : Colors.black,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            data['description'] ?? '',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: isDark ? Colors.grey[300] : Colors.grey[600],
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => IncidentDetailScreen(
-                                              incidentId: incident['id'],
-                                              incident: data,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        minimumSize: const Size(30, 20),
-                                      ),
-                                      child: Text(
-                                        'ดู',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.tealAccent,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _animatePanelTo(double targetHeight) {
-    final startHeight = _panelHeight;
-    final heightDifference = targetHeight - startHeight;
-    const duration = Duration(milliseconds: 300);
-    
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-    
-    void animate() {
-      final currentTime = DateTime.now().millisecondsSinceEpoch;
-      final elapsed = currentTime - startTime;
-      final progress = (elapsed / duration.inMilliseconds).clamp(0.0, 1.0);
-      
-      // Use easeOutCubic curve for smooth animation
-      final curvedProgress = 1 - (1 - progress) * (1 - progress) * (1 - progress);
-      
-      setState(() {
-        _panelHeight = startHeight + (heightDifference * curvedProgress);
-        _showIncidentPanel = _panelHeight > 100;
-      });
-      
-      if (progress < 1.0) {
-        Future.delayed(const Duration(milliseconds: 16), animate);
-      } else {
-        setState(() {
-          _panelHeight = targetHeight;
-          _showIncidentPanel = targetHeight > 100;
-        });
-      }
-    }
-    
-    animate();
   }
 
   Widget _buildSearchResults(bool isDark) {
@@ -2471,37 +1758,6 @@ class _MainMapScreenState extends State<MainMapScreen> {
                     ),
                   ],
                 ),
-              // Radar center marker (green pin)
-              if (_radarCenter != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _radarCenter!,
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.green.withValues(alpha: 0.5),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.gps_fixed,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              // Radar circle is now handled by RadarPainter overlay
           ],
         ),
         // Map popup with enhanced styling
@@ -2584,119 +1840,63 @@ class _MainMapScreenState extends State<MainMapScreen> {
                     style: TextStyle(color: isDark ? Colors.grey : Colors.black54),
                   ),
                   const SizedBox(height: 12),
-                  // First row with Report and Set Center Point buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Colors.red, Colors.redAccent],
-                            ),
-                            borderRadius: BorderRadius.circular(25),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.red.withValues(alpha: 0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                  // Report action button
+                  SizedBox(
+                    width: double.infinity,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Colors.red, Colors.redAccent],
+                        ),
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.report_problem, size: 18),
-                            label: const Text('Report', style: TextStyle(fontSize: 12)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                            ),
-                            onPressed: () async {
-                              final navigator = Navigator.of(context);
-                              final user = FirebaseAuth.instance.currentUser;
-                              if (user == null) {
-                                await navigator.push(
-                                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                                );
-                                if (FirebaseAuth.instance.currentUser == null) return;
-                              }
-                              
-                              final result = await navigator.push(
-                                MaterialPageRoute(
-                                  builder: (_) => IncidentFormScreen(
-                                    latitude: _selectedLocation?.latitude,
-                                    longitude: _selectedLocation?.longitude,
-                                  ),
-                                ),
-                              );
-                              
-                              if (result == true) {
-                                setState(() {
-                                  _showPopup = false;
-                                  _selectedLocation = null;
-                                });
-                              }
-                            },
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.report_problem, size: 18),
+                        label: const Text('Report', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Colors.teal, Colors.tealAccent],
-                            ),
-                            borderRadius: BorderRadius.circular(25),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.teal.withValues(alpha: 0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.center_focus_strong, size: 18),
-                            label: const Text('Set Center', style: TextStyle(fontSize: 12)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25),
+                        onPressed: () async {
+                          final navigator = Navigator.of(context);
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user == null) {
+                            await navigator.push(
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                            );
+                            if (FirebaseAuth.instance.currentUser == null) return;
+                          }
+                          
+                          final result = await navigator.push(
+                            MaterialPageRoute(
+                              builder: (_) => IncidentFormScreen(
+                                latitude: _selectedLocation?.latitude,
+                                longitude: _selectedLocation?.longitude,
                               ),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _radarCenter = _selectedLocation;
-                                _radarConfirmed = false; // Reset confirmation when center changes
-                                _nearbyIncidents.clear();
-                                _showIncidentPanel = false;
-                                _showPopup = false;
-                                _selectedLocation = null;
-                              });
-                              
-                              // Show feedback message
-                              final messenger = ScaffoldMessenger.of(context);
-                              messenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text('Radar center point set! Adjust radius and press OK to search.'),
-                                  backgroundColor: Colors.teal,
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                          );
+                          
+                          if (result == true) {
+                            setState(() {
+                              _showPopup = false;
+                              _selectedLocation = null;
+                            });
+                          }
+                        },
                       ),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 8),
                   // Second row with Cancel button
@@ -2912,60 +2112,4 @@ class _EnhancedZoomButtonState extends State<_EnhancedZoomButton>
       },
     );
   }
-}
-
-class RadarPainter extends CustomPainter {
-  final LatLng center;
-  final double radius;
-  final List<Map<String, dynamic>> incidents;
-  final Function(Map<String, dynamic>) onIncidentTap;
-
-  RadarPainter({
-    required this.center,
-    required this.radius,
-    required this.incidents,
-    required this.onIncidentTap,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.tealAccent.withValues(alpha: 0.3)
-      ..style = PaintingStyle.fill;
-
-    final strokePaint = Paint()
-      ..color = Colors.tealAccent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-
-    // Draw radar circle
-    final centerPoint = Offset(size.width / 2, size.height / 2);
-    final radiusPixels = radius * 50; // Convert km to pixels (approximate)
-
-    canvas.drawCircle(centerPoint, radiusPixels, paint);
-    canvas.drawCircle(centerPoint, radiusPixels, strokePaint);
-
-    // Draw incident markers
-    final incidentPaint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.fill;
-
-    for (final incident in incidents) {
-      final data = incident['data'] as Map<String, dynamic>;
-      final lat = data['latitude'] as double;
-      final lng = data['longitude'] as double;
-      
-      // Convert lat/lng to screen coordinates (simplified)
-      final dx = centerPoint.dx + (lng - center.longitude) * 1000;
-      final dy = centerPoint.dy - (lat - center.latitude) * 1000;
-      
-      canvas.drawCircle(Offset(dx, dy), 4, incidentPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-
-  @override
-  bool hitTest(Offset position) => true;
 }

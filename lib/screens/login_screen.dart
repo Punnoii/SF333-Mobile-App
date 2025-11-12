@@ -145,7 +145,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
                         ),
                         onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
                           final navigator = Navigator.of(context);
                           try {
                             // Validate email format
