@@ -16,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool rememberMe = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -69,8 +70,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     TextField(
                       controller: passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(),
+                      obscureText: _obscurePassword,
+                      decoration: InputDecoration(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(
