@@ -32,14 +32,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Positioned(
+                top: 16,
+                left: 16,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
             Center(
               child: SingleChildScrollView(
                 child: Container(
@@ -101,8 +107,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           onPressed: agree
                               ? () async {
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  final navigator = Navigator.of(context);
                                   if (passwordController.text != confirmPasswordController.text) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(content: Text('Passwords do not match')),
                                     );
                                     return;
@@ -128,12 +136,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     });
                                     
                                     if (!mounted) return;
-                                    Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(content: Text('Registered successfully. Please login.')),
                                     );
+                                    if (!mounted) return;
+                                    navigator.pop();
                                   } on FirebaseAuthException catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    if (!mounted) return;
+                                    messenger.showSnackBar(
                                       SnackBar(content: Text(e.message ?? 'Register failed')),
                                     );
                                   }
@@ -157,12 +167,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: const Text('Already have an account? Login'),
                 ),
               ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-
-

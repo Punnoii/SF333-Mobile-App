@@ -48,28 +48,52 @@ class _SplashScreenState extends State<SplashScreen>
     // Start animations
     _animationController.forward();
     
-    // Wait for animations and check auth
-    await Future.delayed(const Duration(seconds: 3));
-    
-    if (mounted) {
-      _navigateToNextScreen();
+    try {
+      // Wait for animations with timeout protection
+      await Future.delayed(const Duration(seconds: 2)).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('Splash animation timed out, proceeding to next screen');
+        },
+      );
+      
+      // Add a small delay to ensure Firebase is ready
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (mounted) {
+        _navigateToNextScreen();
+      }
+    } catch (e) {
+      debugPrint('Splash sequence error: $e');
+      if (mounted) {
+        _navigateToNextScreen();
+      }
     }
   }
 
   void _navigateToNextScreen() {
-    final user = FirebaseAuth.instance.currentUser;
-    
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            user != null ? const MainMapScreen() : const LoginScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 500),
-      ),
-    );
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              user != null ? const MainMapScreen() : const LoginScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Navigation error: $e');
+      // Fallback to login screen if Firebase auth fails
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    }
   }
 
   @override
@@ -106,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen>
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.tealAccent.withOpacity(0.3),
+                            color: Colors.tealAccent.withValues(alpha: 0.3),
                             blurRadius: 20,
                             spreadRadius: 5,
                           ),

@@ -15,4 +15,6 @@ class AppConfig {
   // Cloudinary Configuration
   static String get cloudinaryCloudName => dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
   static String get cloudinaryUploadPreset => dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
+  // Notification configuration
+  static String get fcmServerKey => dotenv.env['FCM_SERVER_KEY'] ?? '';
 }

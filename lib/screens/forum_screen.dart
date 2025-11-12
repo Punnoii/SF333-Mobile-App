@@ -115,7 +115,7 @@ class _ForumScreenState extends State<ForumScreen> {
 
   Future<void> _deletePost(String postId) async {
     try {
-      // Just delete the post - Firestore will handle subcollections
+      await _deletePostSubcollections(postId);
       await _firestore.collection('posts').doc(postId).delete();
 
       if (mounted) {
@@ -130,6 +130,28 @@ class _ForumScreenState extends State<ForumScreen> {
         );
       }
     }
+  }
+
+  Future<void> _deletePostSubcollections(String postId) async {
+    final postRef = _firestore.collection('posts').doc(postId);
+    await Future.wait([
+      _deleteCollection(postRef.collection('likes')),
+      _deleteCollection(postRef.collection('comments')),
+    ]);
+  }
+
+  Future<void> _deleteCollection(CollectionReference collectionRef, {int batchSize = 100}) async {
+    QuerySnapshot batch;
+    do {
+      batch = await collectionRef.limit(batchSize).get();
+      if (batch.docs.isEmpty) break;
+
+      final writeBatch = _firestore.batch();
+      for (final doc in batch.docs) {
+        writeBatch.delete(doc.reference);
+      }
+      await writeBatch.commit();
+    } while (batch.docs.length == batchSize);
   }
 
   @override
@@ -154,7 +176,7 @@ class _ForumScreenState extends State<ForumScreen> {
             ),
           ),
         ),
-        backgroundColor: isDark ? Colors.black.withOpacity(0.9) : Colors.white,
+        backgroundColor: isDark ? Colors.black.withValues(alpha: 0.9) : Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false,
         flexibleSpace: Container(
@@ -163,8 +185,8 @@ class _ForumScreenState extends State<ForumScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: isDark ? [
-                Colors.black.withOpacity(0.9),
-                Colors.grey[900]!.withOpacity(0.9),
+                Colors.black.withValues(alpha: 0.9),
+                Colors.grey[900]!.withValues(alpha: 0.9),
               ] : [
                 Colors.white,
                 Colors.grey[50]!,
@@ -193,12 +215,12 @@ class _ForumScreenState extends State<ForumScreen> {
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Colors.tealAccent.withOpacity(0.2),
+                color: Colors.tealAccent.withValues(alpha: 0.2),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+                  color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.2),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -236,7 +258,7 @@ class _ForumScreenState extends State<ForumScreen> {
                         style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                         decoration: InputDecoration(
                           hintText: 'What\'s on your mind?',
-                          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                          hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54),
                           border: InputBorder.none,
                         ),
                         maxLines: 3,
@@ -294,7 +316,7 @@ class _ForumScreenState extends State<ForumScreen> {
                         borderRadius: BorderRadius.circular(25),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.tealAccent.withOpacity(0.4),
+                            color: Colors.tealAccent.withValues(alpha: 0.4),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -345,11 +367,11 @@ class _ForumScreenState extends State<ForumScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.forum_outlined, size: 64, color: isDark ? Colors.grey[600] : Colors.grey[500]),
+                        Icon(Icons.forum_outlined, size: 64, color: isDark ? Colors.grey[600] : Colors.black54),
                         const SizedBox(height: 16),
-                        Text('No posts yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.grey[700])),
+                        Text('No posts yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.black87)),
                         const SizedBox(height: 8),
-                        Text('Be the first to share something!', style: TextStyle(color: isDark ? Colors.grey[600] : Colors.grey[600])),
+                        Text('Be the first to share something!', style: TextStyle(color: isDark ? Colors.grey[600] : Colors.black54)),
                       ],
                     ),
                   );
@@ -469,7 +491,7 @@ class _PostWidgetState extends State<_PostWidget> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Card(
         elevation: 8,
-        shadowColor: Colors.tealAccent.withOpacity(0.2),
+        shadowColor: Colors.tealAccent.withValues(alpha: 0.2),
         color: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -481,7 +503,7 @@ class _PostWidgetState extends State<_PostWidget> {
               end: Alignment.bottomRight,
               colors: isDark ? [
                 const Color(0xFF2B2B2B),
-                Colors.grey[800]!.withOpacity(0.9),
+                Colors.grey[800]!.withValues(alpha: 0.9),
               ] : [
                 Colors.white,
                 Colors.grey[50]!,
@@ -489,12 +511,12 @@ class _PostWidgetState extends State<_PostWidget> {
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: Colors.tealAccent.withOpacity(0.1),
+              color: Colors.tealAccent.withValues(alpha: 0.1),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+                color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.2),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),

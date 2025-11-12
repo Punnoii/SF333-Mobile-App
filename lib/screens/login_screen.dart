@@ -107,15 +107,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
                         ),
                         onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final navigator = Navigator.of(context);
                           try {
                             await FirebaseAuth.instance.signInWithEmailAndPassword(
                               email: usernameController.text.trim(),
                               password: passwordController.text,
                             );
                             if (!mounted) return;
-                            Navigator.pushReplacementNamed(context, '/main');
+                            navigator.pushReplacementNamed('/main');
                           } on FirebaseAuthException catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            if (!mounted) return;
+                            messenger.showSnackBar(
                               SnackBar(content: Text(e.message ?? 'Login failed')),
                             );
                           }
@@ -144,5 +147,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
-

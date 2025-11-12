@@ -52,7 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _userProfile = data;
         });
-        print('Loaded user profile: $_userProfile');
+        debugPrint('Loaded user profile: $_userProfile');
       } else if (mounted) {
         // Create user profile if it doesn't exist
         await FirebaseFirestore.instance
@@ -70,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _loadUserProfile(); // Reload after creation
       }
     } catch (e) {
-      print('Error loading profile: $e');
+      debugPrint('Error loading profile: $e');
     }
   }
 
@@ -99,9 +99,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.red),
             onPressed: () async {
+              final navigator = Navigator.of(context);
               await FirebaseAuth.instance.signOut();
               if (!mounted) return;
-              Navigator.of(context).pushNamedAndRemoveUntil(
+              navigator.pushNamedAndRemoveUntil(
                 '/login',
                 (route) => false,
               );
@@ -130,7 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     border: Border.all(color: isDark ? Colors.tealAccent : Colors.teal, width: 3),
                     boxShadow: [
                       BoxShadow(
-                        color: isDark ? Colors.tealAccent.withOpacity(0.3) : Colors.teal.withOpacity(0.2),
+                        color: isDark ? Colors.tealAccent.withValues(alpha: 0.3) : Colors.teal.withValues(alpha: 0.2),
                         blurRadius: 12,
                         spreadRadius: 2,
                       ),
@@ -188,7 +189,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!, width: 0.5),
                 boxShadow: [
                   BoxShadow(
-                    color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+                    color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -333,9 +334,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.tealAccent.withOpacity(0.1),
+              color: Colors.tealAccent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+              border: Border.all(color: Colors.tealAccent.withValues(alpha: 0.3)),
             ),
             child: Text(
               value,

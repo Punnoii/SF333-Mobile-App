@@ -55,7 +55,7 @@ class ThemeService extends ChangeNotifier {
     primarySwatch: Colors.teal,
     scaffoldBackgroundColor: Colors.black,
     appBarTheme: AppBarTheme(
-      backgroundColor: Colors.black.withOpacity(0.9),
+      backgroundColor: Colors.black.withValues(alpha: 0.9),
       foregroundColor: Colors.white,
       elevation: 0,
     ),
@@ -97,7 +97,7 @@ class ThemeService extends ChangeNotifier {
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Colors.white,
       selectedItemColor: Colors.teal,
-      unselectedItemColor: Colors.grey,
+      unselectedItemColor: Colors.black54, // Changed from Colors.grey to darker
     ),
     drawerTheme: const DrawerThemeData(
       backgroundColor: Colors.white,
@@ -111,11 +111,20 @@ class ThemeService extends ChangeNotifier {
       bodyMedium: TextStyle(color: Colors.black),
       titleLarge: TextStyle(color: Colors.black),
       titleMedium: TextStyle(color: Colors.black),
+      bodySmall: TextStyle(color: Colors.black87), // Added for better readability
+      labelMedium: TextStyle(color: Colors.black87), // Added for better readability
+      labelSmall: TextStyle(color: Colors.black54), // Added for better readability
     ),
     iconTheme: const IconThemeData(color: Colors.teal),
     cardTheme: const CardThemeData(
       color: Colors.white,
       elevation: 2,
+    ),
+    // Add color scheme for better text contrast
+    colorScheme: const ColorScheme.light(
+      primary: Colors.teal,
+      onSurface: Colors.black87, // Main text color
+      onSurfaceVariant: Colors.black54, // Secondary text color
     ),
   );
 }

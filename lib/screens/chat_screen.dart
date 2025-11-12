@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'dart:io';
 import '../services/cloudinary_service.dart';
 import '../services/theme_service.dart';
+import '../services/notification_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -36,10 +37,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _markChatAsRead();
+    // Mark as read again when user scrolls or interacts
+    _scrollController.addListener(_onScroll);
+  }
+  
+  void _onScroll() {
+    // Mark as read when user scrolls (indicating they're actively reading)
+    _markChatAsRead();
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -50,6 +59,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (currentUser == null) return;
 
     try {
+      // Update lastRead timestamp to current time
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(widget.chatId)
+          .update({
+        'lastRead_${currentUser.uid}': FieldValue.serverTimestamp(),
+      });
+      
+      // Also update with a more recent timestamp to ensure it's newer than any message
+      await Future.delayed(const Duration(milliseconds: 100));
       await FirebaseFirestore.instance
           .collection('chats')
           .doc(widget.chatId)
@@ -57,7 +76,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         'lastRead_${currentUser.uid}': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error marking chat as read: $e');
+      debugPrint('Error marking chat as read: $e');
     }
   }
 
@@ -110,6 +129,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         'lastMessageTimestamp': FieldValue.serverTimestamp(),
         'lastSenderId': user.uid,
       });
+
+      // Send notification to other user
+      await NotificationService.sendChatNotification(
+        recipientId: widget.otherUserId,
+        senderName: user.displayName ?? user.email?.split('@')[0] ?? 'Someone',
+        message: imageUrl != null ? '📷 Photo' : messageText,
+        chatId: widget.chatId,
+      );
 
       // Message sent successfully - UI already cleared
       // Scroll to bottom after sending message
@@ -168,8 +195,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: isDark ? [
-                Colors.black.withOpacity(0.9),
-                Colors.grey[900]!.withOpacity(0.9),
+                Colors.black.withValues(alpha: 0.9),
+                Colors.grey[900]!.withValues(alpha: 0.9),
               ] : [
                 Colors.white,
                 Colors.grey[50]!,
@@ -178,8 +205,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             boxShadow: [
               BoxShadow(
                 color: isDark 
-                  ? Colors.tealAccent.withOpacity(0.1)
-                  : Colors.teal.withOpacity(0.1),
+                  ? Colors.tealAccent.withValues(alpha: 0.1)
+                  : Colors.teal.withValues(alpha: 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, 2),
               ),
@@ -207,7 +234,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.tealAccent.withOpacity(0.3),
+                          color: Colors.tealAccent.withValues(alpha: 0.3),
                           blurRadius: 10,
                           spreadRadius: 2,
                         ),
@@ -268,7 +295,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         'Online',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.green.withOpacity(0.8),
+                          color: Colors.green.withValues(alpha: 0.8),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -287,11 +314,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             end: Alignment.bottomCenter,
             colors: isDark ? [
               const Color(0xFF0A0A0A),
-              const Color(0xFF1A1A1A).withOpacity(0.8),
+              const Color(0xCC1A1A1A),
               const Color(0xFF0A0A0A),
             ] : [
               Colors.grey[50]!,
-              Colors.grey[100]!.withOpacity(0.8),
+              Colors.grey[100]!.withValues(alpha: 0.8),
               Colors.grey[50]!,
             ],
           ),
@@ -315,7 +342,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           Icon(
                             Icons.error_outline,
                             size: 64,
-                            color: Colors.red.withOpacity(0.6),
+                            color: Colors.red.withValues(alpha: 0.6),
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -364,8 +391,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.tealAccent.withOpacity(0.2),
-                                  Colors.cyan.withOpacity(0.2),
+                                  Colors.tealAccent.withValues(alpha: 0.2),
+                                  Colors.cyan.withValues(alpha: 0.2),
                                 ],
                               ),
                             ),
@@ -399,6 +426,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
                   final messages = snapshot.data!.docs;
 
+                  // Mark as read when messages are loaded
+                  if (messages.isNotEmpty) {
+                    Future.delayed(const Duration(milliseconds: 500), () {
+                      _markChatAsRead();
+                    });
+                  }
+
                   // Always scroll to latest message - delay to ensure ListView is built
                   Future.delayed(const Duration(milliseconds: 100), () {
                     if (_scrollController.hasClients && messages.isNotEmpty) {
@@ -420,14 +454,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           onLongPress: isMe ? () {
                             showDialog(
                               context: context,
-                              barrierColor: Colors.black.withOpacity(0.7),
+                              barrierColor: Colors.black.withValues(alpha: 0.7),
                               builder: (BuildContext context) {
                                 return AlertDialog(
                                   backgroundColor: isDark ? const Color(0xFF2B2B2B) : Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(20),
                                     side: BorderSide(
-                                      color: Colors.tealAccent.withOpacity(0.3),
+                                      color: Colors.tealAccent.withValues(alpha: 0.3),
                                       width: 1,
                                     ),
                                   ),
@@ -435,7 +469,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                     children: [
                                       Icon(
                                         Icons.delete_outline,
-                                        color: Colors.red.withOpacity(0.8),
+                                        color: Colors.red.withValues(alpha: 0.8),
                                         size: 28,
                                       ),
                                       const SizedBox(width: 12),
@@ -463,7 +497,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                     Container(
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
-                                          colors: [Colors.red.withOpacity(0.8), Colors.red],
+                                          colors: [Colors.red.withValues(alpha: 0.8), Colors.red],
                                         ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
@@ -509,7 +543,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.3),
+                                          color: Colors.black.withValues(alpha: 0.3),
                                           blurRadius: 4,
                                           offset: const Offset(0, 2),
                                         ),
@@ -585,15 +619,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                       ),
                                       border: Border.all(
                                         color: isMe
-                                            ? Colors.tealAccent.withOpacity(0.3)
-                                            : (isDark ? Colors.grey.withOpacity(0.2) : Colors.grey.withOpacity(0.3)),
+                                            ? Colors.tealAccent.withValues(alpha: 0.3)
+                                            : (isDark ? Colors.grey.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.3)),
                                         width: 1,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
                                           color: isMe 
-                                              ? Colors.tealAccent.withOpacity(0.2)
-                                              : (isDark ? Colors.black.withOpacity(0.4) : Colors.grey.withOpacity(0.2)),
+                                              ? Colors.tealAccent.withValues(alpha: 0.2)
+                                              : (isDark ? Colors.black.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.2)),
                                           blurRadius: 12,
                                           offset: const Offset(0, 4),
                                           spreadRadius: 1,
@@ -610,7 +644,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                               decoration: BoxDecoration(
                                                 boxShadow: [
                                                   BoxShadow(
-                                                    color: Colors.black.withOpacity(0.3),
+                                                    color: Colors.black.withValues(alpha: 0.3),
                                                     blurRadius: 8,
                                                     offset: const Offset(0, 2),
                                                   ),
@@ -688,7 +722,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.tealAccent.withOpacity(0.3),
+                                          color: Colors.tealAccent.withValues(alpha: 0.3),
                                           blurRadius: 8,
                                           spreadRadius: 1,
                                         ),
@@ -761,13 +795,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 ),
                 border: Border(
                   top: BorderSide(
-                    color: Colors.tealAccent.withOpacity(0.2),
+                    color: Colors.tealAccent.withValues(alpha: 0.2),
                     width: 1,
                   ),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: isDark ? Colors.black.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
+                    color: isDark ? Colors.black.withValues(alpha: 0.5) : Colors.grey.withValues(alpha: 0.3),
                     blurRadius: 20,
                     offset: const Offset(0, -5),
                   ),
@@ -787,7 +821,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.4),
+                                    color: Colors.black.withValues(alpha: 0.4),
                                     blurRadius: 15,
                                     offset: const Offset(0, 5),
                                   ),
@@ -815,7 +849,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.red.withOpacity(0.5),
+                                        color: Colors.red.withValues(alpha: 0.5),
                                         blurRadius: 10,
                                         spreadRadius: 2,
                                       ),
@@ -840,7 +874,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.tealAccent.withOpacity(0.4),
+                              color: Colors.tealAccent.withValues(alpha: 0.4),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -867,12 +901,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                             ),
                             borderRadius: BorderRadius.circular(30),
                             border: Border.all(
-                              color: Colors.tealAccent.withOpacity(0.3),
+                              color: Colors.tealAccent.withValues(alpha: 0.3),
                               width: 1.5,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: isDark ? Colors.black.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+                                color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.2),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -907,7 +941,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.tealAccent.withOpacity(0.5),
+                              color: Colors.tealAccent.withValues(alpha: 0.5),
                               blurRadius: 15,
                               offset: const Offset(0, 4),
                             ),

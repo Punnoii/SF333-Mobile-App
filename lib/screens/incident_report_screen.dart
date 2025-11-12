@@ -1,107 +1,102 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'dart:io';
-import '../services/cloudinary_service.dart';
 import '../services/theme_service.dart';
 
 class IncidentReportScreen extends StatefulWidget {
-  final double latitude;
-  final double longitude;
-  
-  const IncidentReportScreen({
-    super.key,
-    required this.latitude,
-    required this.longitude,
-  });
+  const IncidentReportScreen({super.key});
 
   @override
   State<IncidentReportScreen> createState() => _IncidentReportScreenState();
 }
 
 class _IncidentReportScreenState extends State<IncidentReportScreen> {
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
-  File? _selectedImage;
-  bool _isLoading = false;
+  List<Map<String, dynamic>> _incidents = [];
+  bool _isLoading = true;
+  String _selectedFilter = 'All';
   
-  String _selectedCategory = 'Traffic';
-  final List<String> _categories = [
-    'Traffic',
-    'Accident',
-    'Road Work',
-    'Hazard',
-    'Crime',
-    'Emergency',
-    'Other'
+  final List<String> _statusFilters = [
+    'All',
+    'pending',
+    'in_progress', 
+    'resolved',
+    'closed'
   ];
+  
+  final Map<String, Color> _statusColors = {
+    'pending': Colors.orange,
+    'in_progress': Colors.blue,
+    'resolved': Colors.green,
+    'closed': Colors.grey,
+  };
+  
+  final Map<String, IconData> _categoryIcons = {
+    'Traffic': Icons.traffic,
+    'Accident': Icons.car_crash,
+    'Road Work': Icons.construction,
+    'Hazard': Icons.warning,
+    'Crime': Icons.security,
+    'Emergency': Icons.emergency,
+    'Other': Icons.report_problem,
+  };
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    _loadIncidents();
   }
-
-  Future<void> _submitReport() async {
-    if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a title')),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
+  
+  Future<void> _loadIncidents() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      // Upload image if selected
-      String? imageUrl;
-      if (_selectedImage != null) {
-        imageUrl = await CloudinaryService.uploadProfileImage(_selectedImage!, user.uid);
-      }
-
-      // Create incident report
-      await _firestore.collection('incidents').add({
-        'title': _titleController.text.trim(),
-        'description': _descriptionController.text.trim(),
-        'category': _selectedCategory,
-        'latitude': widget.latitude,
-        'longitude': widget.longitude,
-        'imageUrl': imageUrl,
-        'reportedBy': user.uid,
-        'reportedAt': FieldValue.serverTimestamp(),
-        'status': 'active',
+      final snapshot = await _firestore
+          .collection('incidents')
+          .orderBy('reportedAt', descending: true)
+          .get();
+      
+      setState(() {
+        _incidents = snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+        _isLoading = false;
       });
-
-      if (mounted) {
-        Navigator.pop(context, true); // Return true to indicate success
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Incident reported successfully')),
-        );
-      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error reporting incident: $e')),
-        );
-      }
-    } finally {
       setState(() {
         _isLoading = false;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading incidents: $e')),
+        );
+      }
+    }
+  }
+  
+  List<Map<String, dynamic>> get _filteredIncidents {
+    if (_selectedFilter == 'All') {
+      return _incidents;
+    }
+    return _incidents.where((incident) => incident['status'] == _selectedFilter).toList();
+  }
+  
+  String _getTimeAgo(Timestamp? timestamp) {
+    if (timestamp == null) return 'Unknown';
+    
+    final now = DateTime.now();
+    final date = timestamp.toDate();
+    final difference = now.difference(date);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
     }
   }
 
@@ -112,169 +107,325 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Report Incident'),
+        title: const Text('Incident Status', style: TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: isDark ? Colors.black : Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Location info
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[900] : Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on, color: Colors.red),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Lat: ${widget.latitude.toStringAsFixed(4)}, Lng: ${widget.longitude.toStringAsFixed(4)}',
-                      style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600]),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Category selection
-            Text('Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              items: _categories.map((category) {
-                return DropdownMenuItem(
-                  value: category,
-                  child: Text(category),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedCategory = value!;
-                });
-              },
-            ),
-            const SizedBox(height: 20),
-            
-            // Title
-            Text('Title', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _titleController,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-              decoration: InputDecoration(
-                hintText: 'Brief description of the incident',
-                hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.tealAccent : Colors.teal),
-                ),
-              ),
-              maxLines: 1,
-            ),
-            const SizedBox(height: 20),
-            
-            // Description
-            Text('Description', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _descriptionController,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-              decoration: InputDecoration(
-                hintText: 'Detailed description (optional)',
-                hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.tealAccent : Colors.teal),
-                ),
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 20),
-            
-            // Image upload
-            Text('Photo (Optional)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                height: 150,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  border: Border.all(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: _selectedImage != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          _selectedImage!,
-                          fit: BoxFit.cover,
+        elevation: 0,
+        actions: [
+          PopupMenuButton<String>(
+            icon: Icon(Icons.filter_list, color: isDark ? Colors.tealAccent : Colors.teal),
+            onSelected: (value) {
+              setState(() {
+                _selectedFilter = value;
+              });
+            },
+            itemBuilder: (context) => _statusFilters.map((filter) {
+              return PopupMenuItem(
+                value: filter,
+                child: Row(
+                  children: [
+                    if (filter != 'All') 
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _statusColors[filter] ?? Colors.grey,
+                          shape: BoxShape.circle,
                         ),
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_a_photo, size: 50, color: isDark ? Colors.grey : Colors.grey[600]),
-                          const SizedBox(height: 8),
-                          Text('Tap to add photo', style: TextStyle(color: isDark ? Colors.grey : Colors.grey[600])),
-                        ],
                       ),
+                    if (filter != 'All') const SizedBox(width: 8),
+                    Text(filter == 'All' ? 'All Status' : filter.replaceAll('_', ' ').toUpperCase()),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _filteredIncidents.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.report_outlined,
+                        size: 64,
+                        color: isDark ? Colors.grey[600] : Colors.grey[500],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No incidents found',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: isDark ? Colors.grey[400] : Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _selectedFilter == 'All' 
+                            ? 'No incidents have been reported yet'
+                            : 'No incidents with ${_selectedFilter.replaceAll('_', ' ')} status',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.grey[500] : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadIncidents,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: _filteredIncidents.length,
+                    itemBuilder: (context, index) {
+                      final incident = _filteredIncidents[index];
+                      final status = incident['status'] ?? 'pending';
+                      final category = incident['category'] ?? 'Other';
+                      
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        elevation: 2,
+                        color: isDark ? Colors.grey[850] : Colors.white,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: _statusColors[status]?.withValues(alpha: 0.2) ?? Colors.grey.withValues(alpha: 0.2),
+                            child: Icon(
+                              _categoryIcons[category] ?? Icons.report_problem,
+                              color: _statusColors[status] ?? Colors.grey,
+                              size: 20,
+                            ),
+                          ),
+                          title: Text(
+                            incident['title'] ?? 'Untitled Incident',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                incident['description'] ?? 'No description',
+                                style: TextStyle(
+                                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                  fontSize: 14,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: _statusColors[status]?.withValues(alpha: 0.2) ?? Colors.grey.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      status.replaceAll('_', ' ').toUpperCase(),
+                                      style: TextStyle(
+                                        color: _statusColors[status] ?? Colors.grey,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    category,
+                                    style: TextStyle(
+                                      color: isDark ? Colors.grey[500] : Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                _getTimeAgo(incident['reportedAt']),
+                                style: TextStyle(
+                                  color: isDark ? Colors.grey[500] : Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              if (incident['latitude'] != null && incident['longitude'] != null)
+                                Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: isDark ? Colors.grey[500] : Colors.grey[600],
+                                ),
+                            ],
+                          ),
+                          onTap: () {
+                            // TODO: Navigate to incident detail screen
+                            _showIncidentDetails(incident);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+    );
+  }
+  
+  void _showIncidentDetails(Map<String, dynamic> incident) {
+    final themeService = Provider.of<ThemeService>(context, listen: false);
+    final isDark = themeService.isDarkMode;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[900] : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[600] : Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 30),
-            
-            // Submit button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _submitReport,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Report Incident',
-                        style: TextStyle(fontSize: 16, color: Colors.white),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      incident['title'] ?? 'Untitled Incident',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _statusColors[incident['status']]?.withValues(alpha: 0.2) ?? Colors.grey.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            (incident['status'] ?? 'pending').replaceAll('_', ' ').toUpperCase(),
+                            style: TextStyle(
+                              color: _statusColors[incident['status']] ?? Colors.grey,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          incident['category'] ?? 'Other',
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    if (incident['description'] != null && incident['description'].toString().isNotEmpty) ...[
+                      Text(
+                        'Description',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        incident['description'],
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[300] : Colors.grey[700],
+                          fontSize: 14,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                    if (incident['latitude'] != null && incident['longitude'] != null) ...[
+                      Text(
+                        'Location',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.grey[800] : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Lat: ${incident['latitude'].toStringAsFixed(4)}, Lng: ${incident['longitude'].toStringAsFixed(4)}',
+                                style: TextStyle(
+                                  color: isDark ? Colors.grey[300] : Colors.grey[700],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                    Text(
+                      'Reported',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _getTimeAgo(incident['reportedAt']),
+                      style: TextStyle(
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
+    }
 }
