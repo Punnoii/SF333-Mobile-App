@@ -77,7 +77,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Choose Avatar'),
+        title: const Text('เลือกรูปโปรไฟล์'),
         content: SizedBox(
           width: double.maxFinite,
           height: 300,
@@ -120,7 +120,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('ยกเลิก'),
           ),
         ],
       ),
@@ -148,7 +148,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             end: Alignment.bottomRight,
           ).createShader(bounds),
           child: const Text(
-            'Edit Profile',
+            'แก้ไขโปรไฟล์',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -216,28 +216,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   TextButton(
                     onPressed: _pickImage,
-                    child: const Text('Upload Photo'),
+                    child: const Text('อัปโหลดรูป'),
                   ),
                   TextButton(
                     onPressed: _showAvatarPicker,
-                    child: const Text('Choose Avatar'),
+                    child: const Text('เลือกรูปสำเร็จรูป'),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              const Text('Username'),
+              const Text('ชื่อผู้ใช้'),
               TextField(controller: usernameController),
               const SizedBox(height: 12),
-              const Text('Full Name'),
+              const Text('ชื่อ-นามสกุล'),
               TextField(controller: fullNameController),
               const SizedBox(height: 12),
-              const Text('Phone number'),
+              const Text('เบอร์โทรศัพท์'),
               TextField(controller: phoneController, keyboardType: TextInputType.phone),
               const SizedBox(height: 12),
-              const Text('Email'),
+              const Text('อีเมล'),
               TextField(controller: emailController, keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 12),
-              const Text('Type of disability'),
+              const Text('ประเภทความพิการ/ภาวะ'),
               TextField(controller: disabilityController, maxLines: 3),
               const SizedBox(height: 20),
               Container(
@@ -303,7 +303,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       if (email.isEmpty) {
                         if (!mounted) return;
                         messenger.showSnackBar(
-                          const SnackBar(content: Text('Email is required')),
+                          const SnackBar(content: Text('กรุณากรอกอีเมล')),
                         );
                         return;
                       }
@@ -323,18 +323,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       }, SetOptions(merge: true));
                       if (!mounted) return;
                       messenger.showSnackBar(
-                        const SnackBar(content: Text('Profile saved successfully')),
+                        const SnackBar(content: Text('บันทึกโปรไฟล์เรียบร้อยแล้ว')),
                       );
                       if (!mounted) return;
                       navigator.pop();
                     } catch (e) {
                       if (!mounted) return;
                       messenger.showSnackBar(
-                        SnackBar(content: Text('Error saving profile: $e')),
+                        const SnackBar(content: Text('บันทึกโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')),
                       );
                     }
                   },
-                  child: const Text('Save'),
+                  child: const Text('บันทึก'),
                 ),
               ),
             ],

@@ -9,12 +9,12 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
-      appBar: AppBar(title: const Text('Home')),
+      appBar: AppBar(title: const Text('หน้าหลัก')),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Signed in as: ${user?.email ?? 'Unknown'}'),
+            Text('เข้าสู่ระบบด้วย: ${user?.email ?? 'ไม่ทราบอีเมล'}'),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () async {
@@ -25,7 +25,7 @@ class HomeScreen extends StatelessWidget {
                   (route) => false,
                 );
               },
-              child: const Text('Sign out'),
+              child: const Text('ออกจากระบบ'),
             ),
           ],
         ),
@@ -33,5 +33,4 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
 

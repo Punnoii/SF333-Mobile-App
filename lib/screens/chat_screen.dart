@@ -132,7 +132,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       });
 
       await _firestore.collection('chats').doc(widget.chatId).update({
-        'lastMessage': imageUrl != null ? '📷 Photo' : messageText,
+        'lastMessage': imageUrl != null ? '📷 รูปภาพ' : messageText,
         'lastMessageTimestamp': FieldValue.serverTimestamp(),
         'lastSenderId': user.uid,
       });
@@ -141,7 +141,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       await NotificationService.sendChatNotification(
         recipientId: widget.otherUserId,
         senderName: user.displayName ?? user.email?.split('@')[0] ?? 'Someone',
-        message: imageUrl != null ? '📷 Photo' : messageText,
+        message: imageUrl != null ? '📷 รูปภาพ' : messageText,
         chatId: widget.chatId,
       );
 
@@ -160,7 +160,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           _selectedImage = imageToSend;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending message: $e')),
+          const SnackBar(
+            content: Text('ส่งข้อความไม่สำเร็จ กรุณาลองอีกครั้ง'),
+          ),
         );
       }
     }
@@ -177,7 +179,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting message: $e')),
+          const SnackBar(
+            content: Text('ลบข้อความไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'),
+          ),
         );
       }
     }
@@ -186,7 +190,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Scaffold(body: Center(child: Text('Please login')));
+    if (user == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('กรุณาเข้าสู่ระบบ'),
+        ),
+      );
+    }
     
     final themeService = Provider.of<ThemeService>(context);
     final isDark = themeService.isDarkMode;

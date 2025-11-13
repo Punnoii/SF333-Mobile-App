@@ -26,13 +26,13 @@ class IncidentDetailScreen extends StatelessWidget {
       if (context.mounted) {
         Navigator.pop(context, true); // Return true to indicate deletion
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Incident deleted successfully')),
+          const SnackBar(content: Text('ลบเหตุเรียบร้อยแล้ว')),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting incident: $e')),
+          const SnackBar(content: Text('ลบเหตุไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')),
         );
       }
     }
@@ -57,7 +57,7 @@ class IncidentDetailScreen extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error approving completion: $e')),
+          const SnackBar(content: Text('ไม่สามารถอนุมัติการทำงานได้ กรุณาลองใหม่อีกครั้ง')),
         );
       }
     }
@@ -100,7 +100,7 @@ class IncidentDetailScreen extends StatelessWidget {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text(incident['title'] ?? 'Incident Details'),
+        title: Text(incident['title'] ?? 'รายละเอียดเหตุ'),
         backgroundColor: isDark ? Colors.black : Colors.white,
         actions: [
           if (isOwner)
@@ -112,18 +112,18 @@ class IncidentDetailScreen extends StatelessWidget {
                   builder: (context) => AlertDialog(
                     backgroundColor: isDark ? Colors.grey[900] : Colors.white,
                     title: Text(
-                      'Delete Incident',
+                      'ลบเหตุ',
                       style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                     ),
                     content: Text(
-                      'Are you sure you want to delete this incident? This action cannot be undone.',
+                      'ยืนยันการลบเหตุนี้หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้',
                       style: TextStyle(color: isDark ? Colors.grey[300] : Colors.black87),
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
                         child: Text(
-                          'Cancel',
+                          'ยกเลิก',
                           style: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54),
                         ),
                       ),
@@ -132,7 +132,7 @@ class IncidentDetailScreen extends StatelessWidget {
                           Navigator.pop(context);
                           _deleteIncident(context);
                         },
-                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                        child: const Text('ลบ', style: TextStyle(color: Colors.red)),
                       ),
                     ],
                   ),
@@ -154,7 +154,7 @@ class IncidentDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                incident['category'] ?? 'Unknown',
+                incident['category'] ?? 'ไม่ทราบประเภท',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -166,7 +166,7 @@ class IncidentDetailScreen extends StatelessWidget {
             
             // Title
             Text(
-              incident['title'] ?? 'No Title',
+              incident['title'] ?? 'ยังไม่มีชื่อเหตุ',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -181,7 +181,7 @@ class IncidentDetailScreen extends StatelessWidget {
                 const Icon(Icons.location_on, color: Colors.red, size: 16),
                 const SizedBox(width: 4),
                 Text(
-                  'Lat: ${incident['latitude']?.toStringAsFixed(4)}, Lng: ${incident['longitude']?.toStringAsFixed(4)}',
+                  'ละติจูด ${incident['latitude']?.toStringAsFixed(4)}, ลองจิจูด ${incident['longitude']?.toStringAsFixed(4)}',
                   style: TextStyle(color: isDark ? Colors.grey : Colors.black54),
                 ),
               ],
@@ -196,7 +196,7 @@ class IncidentDetailScreen extends StatelessWidget {
                   .get(),
               builder: (context, snapshot) {
                 final userData = snapshot.data?.data() as Map<String, dynamic>?;
-                final reporterName = userData?['email']?.split('@')[0] ?? incident['reporterEmail']?.split('@')[0] ?? 'Unknown User';
+                final reporterName = userData?['email']?.split('@')[0] ?? incident['reporterEmail']?.split('@')[0] ?? 'ไม่ทราบผู้ใช้';
                 
                 return Row(
                   children: [
@@ -218,7 +218,7 @@ class IncidentDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Reported by $reporterName',
+                      'รายงานโดย $reporterName',
                       style: TextStyle(color: isDark ? Colors.grey : Colors.black54),
                     ),
                     if (reportedAt != null) ...[
@@ -257,7 +257,7 @@ class IncidentDetailScreen extends StatelessWidget {
             // Description
             if (incident['description'] != null && incident['description'].toString().isNotEmpty) ...[
               Text(
-                'Description',
+                'รายละเอียด',
                 style: TextStyle(
                   fontSize: 18, 
                   fontWeight: FontWeight.bold,

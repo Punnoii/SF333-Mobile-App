@@ -63,7 +63,9 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Error getting location: $e')),
+        const SnackBar(
+          content: Text('ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาตรวจสอบการอนุญาต'),
+        ),
       );
     } finally {
       setState(() {
@@ -113,7 +115,9 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Error updating status: $e')),
+        const SnackBar(
+          content: Text('อัปเดตสถานะไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'),
+        ),
       );
     }
   }
@@ -127,7 +131,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Repair Details'),
+          title: const Text('รายละเอียดการซ่อมแซม'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -135,8 +139,8 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                 TextField(
                   controller: detailsController,
                   decoration: const InputDecoration(
-                    labelText: 'Repair Details',
-                    hintText: 'Describe how the problem was fixed',
+                    labelText: 'รายละเอียดการซ่อมแซม',
+                    hintText: 'อธิบายขั้นตอนการแก้ปัญหา',
                   ),
                   maxLines: 3,
                 ),
@@ -165,7 +169,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                     }
                   },
                   icon: const Icon(Icons.camera_alt),
-                  label: const Text('Select Image'),
+                  label: const Text('เลือกรูปภาพ'),
                 ),
               ],
             ),
@@ -173,7 +177,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const Text('ยกเลิก'),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -181,7 +185,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                 final navigator = Navigator.of(context);
                 if (detailsController.text.trim().isEmpty) {
                   messenger.showSnackBar(
-                    const SnackBar(content: Text('Please enter repair details')),
+                    const SnackBar(content: Text('กรุณากรอกรายละเอียดการซ่อมแซม')),
                   );
                   return;
                 }
@@ -204,7 +208,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                   fixerDetails: detailsController.text.trim(),
                 );
               },
-              child: const Text('Confirm'),
+              child: const Text('ยืนยัน'),
             ),
           ],
         ),
@@ -232,16 +236,16 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
         children: [
           const Icon(Icons.filter_list, size: 20),
           const SizedBox(width: 8),
-          const Text('Status: '),
+          const Text('สถานะ: '),
           Expanded(
             child: DropdownButton<String>(
               value: _selectedStatus,
               isExpanded: true,
               items: const [
-                DropdownMenuItem(value: 'all', child: Text('All')),
-                DropdownMenuItem(value: 'reported', child: Text('Reported')),
-                DropdownMenuItem(value: 'in_progress', child: Text('In Progress')),
-                DropdownMenuItem(value: 'resolved', child: Text('Resolved')),
+                DropdownMenuItem(value: 'all', child: Text('ทั้งหมด')),
+                DropdownMenuItem(value: 'reported', child: Text('รอการตรวจสอบ')),
+                DropdownMenuItem(value: 'in_progress', child: Text('กำลังดำเนินการ')),
+                DropdownMenuItem(value: 'resolved', child: Text('แก้ไขแล้ว')),
               ],
               onChanged: (value) {
                 setState(() {
@@ -271,7 +275,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
               end: Alignment.bottomRight,
             ).createShader(bounds),
             child: const Text(
-              'My Reported Incidents',
+              'เหตุที่ฉันแจ้ง',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -319,7 +323,9 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                 stream: _getIncidentsStream(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
+                    return const Center(
+                      child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'),
+                    );
                   }
 
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -342,8 +348,8 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                     return Center(
                       child: Text(
                         _selectedStatus == 'all' 
-                          ? 'You have not reported any incidents yet.'
-                          : 'No incidents found with status: ${_getStatusText(_selectedStatus)}',
+                          ? 'ยังไม่มีการแจ้งเหตุของคุณ'
+                          : 'ไม่พบเหตุสถานะ ${_getStatusText(_selectedStatus)}',
                         style: TextStyle(
                           fontSize: 16,
                           color: isDark ? Colors.grey[600] : Colors.black54,
@@ -378,7 +384,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                       }
                       if (!normalizedData.containsKey('reporterEmail') && normalizedData.containsKey('reportedBy')) {
                         // Try to get email from user document if not available
-                        normalizedData['reporterEmail'] = 'Unknown';
+                        normalizedData['reporterEmail'] = 'ไม่ทราบ';
                       }
                       
                       return _IncidentCard(
@@ -592,7 +598,7 @@ class _IncidentCard extends StatelessWidget {
                     final userData = snapshot.data?.data() as Map<String, dynamic>?;
                     final reporterName = userData?['email']?.split('@')[0] ?? 
                                        data['reporterEmail']?.split('@')[0] ?? 
-                                       'Unknown Reporter';
+                                       'ไม่ทราบผู้แจ้ง';
                     
                     return Text(
                       reporterName,
@@ -637,7 +643,7 @@ class _IncidentCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('View Details'),
+                        child: const Text('ดูรายละเอียด'),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -693,7 +699,7 @@ class _IncidentCard extends StatelessWidget {
                                 SizedBox(width: 4),
                                 Flexible(
                                   child: Text(
-                                    'Status',
+                                    'เปลี่ยนสถานะ',
                                     style: TextStyle(color: Colors.black, fontSize: 12),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -715,7 +721,8 @@ class _IncidentCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text('Take Job'),
+                          //TODO dont know this function . check later
+                          child: const Text('ขอรับงาน'),
                         ),
                       ),
                     ],

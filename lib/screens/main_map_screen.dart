@@ -171,7 +171,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
         mapController.move(_currentCenter, 15.0);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Location found: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
+            content: Text('พบตำแหน่งแล้ว: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
           ),
@@ -182,6 +182,11 @@ class _MainMapScreenState extends State<MainMapScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      LoggingService.error(
+        'Unable to resolve location: ${errorDetails.isEmpty ? e.toString() : errorDetails}',
+        error: e,
+        category: _logCategory,
+      );
       // Use Bangkok default on any error
       setState(() {
         _currentCenter = const LatLng(13.7563, 100.5018); // Bangkok default
@@ -189,17 +194,13 @@ class _MainMapScreenState extends State<MainMapScreen> {
       mapController.move(_currentCenter, 12.0);
       
       // Show detailed error message
-      final errorMessage = errorDetails.isNotEmpty 
-          ? 'Location Error: $errorDetails' 
-          : 'Location Error: ${e.toString()}';
-          
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$errorMessage\nUsing Bangkok default location'),
+          content: const Text('ไม่สามารถระบุตำแหน่งได้ ระบบจะใช้พิกัดกรุงเทพฯชั่วคราว'),
           backgroundColor: Colors.orange,
           duration: const Duration(seconds: 4),
           action: SnackBarAction(
-            label: 'Retry',
+            label: 'ลองอีกครั้ง',
             onPressed: () => _getCurrentLocation(),
           ),
         ),
@@ -1278,7 +1279,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                     leading: Icon(
                       themeService.isDarkMode ? Icons.light_mode : Icons.dark_mode,
                     ),
-                    title: Text(themeService.isDarkMode ? 'Light Mode' : 'Dark Mode'),
+                    title: Text(themeService.isDarkMode ? 'โหมดสว่าง' : 'โหมดมืด'),
                     onTap: () {
                       themeService.toggleTheme();
                       Navigator.pop(context);
@@ -1288,7 +1289,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline), 
-                title: Text('About')
+                title: Text('เกี่ยวกับ')
               ),
             ],
           ),
@@ -1385,11 +1386,11 @@ class _MainMapScreenState extends State<MainMapScreen> {
                     ),
                 ],
               ),
-              label: 'Chat',
+              label: 'แชต',
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.map),
-              label: 'Map',
+              label: 'แผนที่',
             ),
             BottomNavigationBarItem(
               icon: AnimatedContainer(
@@ -1403,7 +1404,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 ),
                 child: const Icon(Icons.assignment_outlined),
               ),
-              label: 'Status',
+              label: 'สถานะ',
             ),
             BottomNavigationBarItem(
               icon: AnimatedContainer(
@@ -1417,7 +1418,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 ),
                 child: const Icon(Icons.person_outline),
               ),
-              label: 'Profile',
+              label: 'โปรไฟล์',
             ),
           ],
         ),
@@ -1472,7 +1473,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
         controller: _searchController,
         style: TextStyle(color: isDark ? Colors.white : Colors.black),
         decoration: InputDecoration(
-          hintText: 'Search places...',
+          hintText: 'ค้นหาสถานที่ ...',
           hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
           prefixIcon: Icon(
             Icons.search,
@@ -1613,7 +1614,7 @@ class _MainMapScreenState extends State<MainMapScreen> {
               final messenger = ScaffoldMessenger.of(context);
               messenger.showSnackBar(
                 SnackBar(
-                  content: Text('Moved to ${result['title']}'),
+                  content: Text('ย้ายตำแหน่งไปยัง ${result['title']}'),
                   duration: const Duration(seconds: 2),
                   backgroundColor: Colors.teal,
                 ),

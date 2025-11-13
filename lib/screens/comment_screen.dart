@@ -50,7 +50,7 @@ class _CommentScreenState extends State<CommentScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error adding comment: $e')),
+          const SnackBar(content: Text('ไม่สามารถส่งความคิดเห็นได้ กรุณาลองใหม่อีกครั้ง')),
         );
       }
     }
@@ -60,7 +60,7 @@ class _CommentScreenState extends State<CommentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Comments'),
+        title: const Text('ความคิดเห็น'),
         backgroundColor: Colors.black,
       ),
       body: Column(
@@ -75,7 +75,7 @@ class _CommentScreenState extends State<CommentScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดความคิดเห็น'));
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -85,7 +85,7 @@ class _CommentScreenState extends State<CommentScreen> {
                 final comments = snapshot.data?.docs ?? [];
 
                 if (comments.isEmpty) {
-                  return const Center(child: Text('No comments yet. Be the first to comment!'));
+                  return const Center(child: Text('ยังไม่มีความคิดเห็น มาแสดงความคิดเห็นกันเลย!'));
                 }
 
                 return ListView.builder(
@@ -165,7 +165,7 @@ class _CommentScreenState extends State<CommentScreen> {
                                         );
                                       },
                                       child: Text(
-                                        data['authorEmail']?.split('@')[0] ?? 'Unknown',
+                                        data['authorEmail']?.split('@')[0] ?? 'ไม่ทราบชื่อ',
                                         style: const TextStyle(fontWeight: FontWeight.bold),
                                       ),
                                     ),
@@ -203,7 +203,7 @@ class _CommentScreenState extends State<CommentScreen> {
                   child: TextField(
                     controller: _commentController,
                     decoration: const InputDecoration(
-                      hintText: 'Write a comment...',
+                      hintText: 'พิมพ์ความคิดเห็น...',
                       border: InputBorder.none,
                     ),
                     maxLines: null,

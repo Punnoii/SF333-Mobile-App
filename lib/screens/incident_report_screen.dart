@@ -32,6 +32,13 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
     'closed': Colors.grey,
   };
   
+  final Map<String, String> _statusLabels = {
+    'pending': 'รอดำเนินการ',
+    'in_progress': 'กำลังดำเนินการ',
+    'resolved': 'แก้ไขแล้ว',
+    'closed': 'ปิดเหตุ',
+  };
+  
   final Map<String, IconData> _categoryIcons = {
     'Traffic': Icons.traffic,
     'Accident': Icons.car_crash,
@@ -41,6 +48,19 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
     'Emergency': Icons.emergency,
     'Other': Icons.report_problem,
   };
+
+  final Map<String, String> _categoryLabels = {
+    'Traffic': 'การจราจร',
+    'Accident': 'อุบัติเหตุ',
+    'Road Work': 'ซ่อมถนน',
+    'Hazard': 'จุดอันตราย',
+    'Crime': 'เหตุอาชญากรรม',
+    'Emergency': 'เหตุฉุกเฉิน',
+    'Other': 'อื่นๆ',
+  };
+
+  String _getStatusLabel(String status) => _statusLabels[status] ?? 'ไม่ทราบสถานะ';
+  String _getCategoryLabel(String category) => _categoryLabels[category] ?? category;
 
   @override
   void initState() {
@@ -69,7 +89,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading incidents: $e')),
+          const SnackBar(content: Text('ไม่สามารถโหลดรายการเหตุได้ กรุณาลองใหม่อีกครั้ง')),
         );
       }
     }
@@ -83,20 +103,20 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
   }
   
   String _getTimeAgo(Timestamp? timestamp) {
-    if (timestamp == null) return 'Unknown';
+    if (timestamp == null) return 'ไม่ทราบเวลา';
     
     final now = DateTime.now();
     final date = timestamp.toDate();
     final difference = now.difference(date);
     
     if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
+      return '${difference.inDays} วันก่อน';
     } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
+      return '${difference.inHours} ชั่วโมงก่อน';
     } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
+      return '${difference.inMinutes} นาทีก่อน';
     } else {
-      return 'Just now';
+      return 'เพิ่งสักครู่';
     }
   }
 
@@ -107,7 +127,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Incident Status', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Text('สถานะเหตุแจ้ง', style: TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: isDark ? Colors.black : Colors.white,
         elevation: 0,
         actions: [
@@ -133,7 +153,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                         ),
                       ),
                     if (filter != 'All') const SizedBox(width: 8),
-                    Text(filter == 'All' ? 'All Status' : filter.replaceAll('_', ' ').toUpperCase()),
+                    Text(filter == 'All' ? 'ทุกสถานะ' : _getStatusLabel(filter)),
                   ],
                 ),
               );
@@ -155,7 +175,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No incidents found',
+                        'ไม่พบเหตุที่รายงาน',
                         style: TextStyle(
                           fontSize: 18,
                           color: isDark ? Colors.grey[400] : Colors.grey[700],
@@ -164,8 +184,8 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _selectedFilter == 'All' 
-                            ? 'No incidents have been reported yet'
-                            : 'No incidents with ${_selectedFilter.replaceAll('_', ' ')} status',
+                            ? 'ยังไม่มีการแจ้งเหตุ'
+                            : 'ไม่พบเหตุสถานะ ${_getStatusLabel(_selectedFilter)}',
                         style: TextStyle(
                           fontSize: 14,
                           color: isDark ? Colors.grey[500] : Colors.grey[600],
@@ -198,7 +218,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                             ),
                           ),
                           title: Text(
-                            incident['title'] ?? 'Untitled Incident',
+                            incident['title'] ?? 'ยังไม่มีชื่อเหตุ',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
@@ -212,7 +232,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                             children: [
                               const SizedBox(height: 4),
                               Text(
-                                incident['description'] ?? 'No description',
+                                incident['description'] ?? 'ไม่มีรายละเอียด',
                                 style: TextStyle(
                                   color: isDark ? Colors.grey[400] : Colors.grey[600],
                                   fontSize: 14,
@@ -230,7 +250,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
-                                      status.replaceAll('_', ' ').toUpperCase(),
+                                      _getStatusLabel(status),
                                       style: TextStyle(
                                         color: _statusColors[status] ?? Colors.grey,
                                         fontSize: 10,
@@ -240,7 +260,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    category,
+                                    _getCategoryLabel(category),
                                     style: TextStyle(
                                       color: isDark ? Colors.grey[500] : Colors.grey[600],
                                       fontSize: 12,
@@ -314,7 +334,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      incident['title'] ?? 'Untitled Incident',
+                      incident['title'] ?? 'ยังไม่มีชื่อเหตุ',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -331,7 +351,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Text(
-                            (incident['status'] ?? 'pending').replaceAll('_', ' ').toUpperCase(),
+                            _getStatusLabel(incident['status'] ?? 'pending'),
                             style: TextStyle(
                               color: _statusColors[incident['status']] ?? Colors.grey,
                               fontSize: 12,
@@ -341,7 +361,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          incident['category'] ?? 'Other',
+                          _getCategoryLabel(incident['category'] ?? 'Other'),
                           style: TextStyle(
                             color: isDark ? Colors.grey[400] : Colors.grey[600],
                             fontSize: 14,
@@ -352,7 +372,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                     const SizedBox(height: 20),
                     if (incident['description'] != null && incident['description'].toString().isNotEmpty) ...[
                       Text(
-                        'Description',
+                        'รายละเอียด',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -372,7 +392,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                     ],
                     if (incident['latitude'] != null && incident['longitude'] != null) ...[
                       Text(
-                        'Location',
+                        'ตำแหน่ง',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -392,7 +412,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Lat: ${incident['latitude'].toStringAsFixed(4)}, Lng: ${incident['longitude'].toStringAsFixed(4)}',
+                                'ละติจูด ${incident['latitude'].toStringAsFixed(4)}, ลองจิจูด ${incident['longitude'].toStringAsFixed(4)}',
                                 style: TextStyle(
                                   color: isDark ? Colors.grey[300] : Colors.grey[700],
                                 ),
@@ -404,7 +424,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                       const SizedBox(height: 20),
                     ],
                     Text(
-                      'Reported',
+                      'รายงานเมื่อ',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,

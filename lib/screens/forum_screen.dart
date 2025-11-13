@@ -72,7 +72,9 @@ class _ForumScreenState extends State<ForumScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating post: $e')),
+          const SnackBar(
+            content: Text('ไม่สามารถสร้างโพสต์ได้ กรุณาลองใหม่อีกครั้ง'),
+          ),
         );
       }
     }
@@ -107,7 +109,9 @@ class _ForumScreenState extends State<ForumScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating like: $e')),
+          const SnackBar(
+            content: Text('ไม่สามารถอัปเดตการกดถูกใจได้ กรุณาลองใหม่อีกครั้ง'),
+          ),
         );
       }
     }
@@ -120,13 +124,15 @@ class _ForumScreenState extends State<ForumScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post deleted successfully')),
+          const SnackBar(content: Text('ลบโพสต์เรียบร้อยแล้ว')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting post: $e')),
+          const SnackBar(
+            content: Text('ลบโพสต์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'),
+          ),
         );
       }
     }
@@ -168,7 +174,7 @@ class _ForumScreenState extends State<ForumScreen> {
             end: Alignment.bottomRight,
           ).createShader(bounds),
           child: const Text(
-            'Forum',
+            'ติดตามปัญหา',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -257,7 +263,7 @@ class _ForumScreenState extends State<ForumScreen> {
                         controller: _postController,
                         style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                         decoration: InputDecoration(
-                          hintText: 'What\'s on your mind?',
+                          hintText: 'กำลังคิดเรื่องอะไรอยู่?',
                           hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54),
                           border: InputBorder.none,
                         ),
@@ -334,7 +340,7 @@ class _ForumScreenState extends State<ForumScreen> {
                           ),
                         ),
                         child: const Text(
-                          'Post',
+                          'โพสต์',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -353,7 +359,7 @@ class _ForumScreenState extends State<ForumScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดโพสต์'));
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -369,9 +375,9 @@ class _ForumScreenState extends State<ForumScreen> {
                       children: [
                         Icon(Icons.forum_outlined, size: 64, color: isDark ? Colors.grey[600] : Colors.black54),
                         const SizedBox(height: 16),
-                        Text('No posts yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.black87)),
+                        Text('ยังไม่มีโพสต์', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.black87)),
                         const SizedBox(height: 8),
-                        Text('Be the first to share something!', style: TextStyle(color: isDark ? Colors.grey[600] : Colors.black54)),
+                        Text('เริ่มแบ่งปันเรื่องราวได้เลย!', style: TextStyle(color: isDark ? Colors.grey[600] : Colors.black54)),
                       ],
                     ),
                   );
@@ -389,7 +395,7 @@ class _ForumScreenState extends State<ForumScreen> {
                       child: _PostWidget(
                         postId: postId,
                         content: data['content'] ?? '',
-                        authorEmail: data['authorEmail'] ?? 'Unknown',
+                        authorEmail: data['authorEmail'] ?? 'ไม่ทราบ',
                         authorId: data['authorId'] ?? '',
                         imageUrl: data['imageUrl'],
                         timestamp: data['timestamp'] as Timestamp?,
@@ -602,19 +608,19 @@ class _PostWidgetState extends State<_PostWidget> {
                         context: context,
                         builder: (context) => AlertDialog(
                           backgroundColor: isDark ? Colors.grey[900] : Colors.white,
-                          title: Text('Delete Post', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                          content: Text('Are you sure you want to delete this post?', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700])),
+                          title: Text('ลบโพสต์', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                          content: Text('ยืนยันการลบโพสต์นี้หรือไม่?', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700])),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
-                              child: Text('Cancel', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700])),
+                              child: Text('ยกเลิก', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700])),
                             ),
                             TextButton(
                               onPressed: () {
                                 Navigator.pop(context);
                                 widget.onDelete();
                               },
-                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                              child: const Text('ลบ', style: TextStyle(color: Colors.red)),
                             ),
                           ],
                         ),
@@ -628,7 +634,7 @@ class _PostWidgetState extends State<_PostWidget> {
                         children: [
                           Icon(Icons.delete, color: Colors.red),
                           SizedBox(width: 8),
-                          Text('Delete Post'),
+                          Text('ลบโพสต์'),
                         ],
                       ),
                     ),

@@ -67,6 +67,26 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
     'Emergency': Icons.emergency,
     'Other': Icons.report_problem,
   };
+  
+  final Map<String, String> _categoryLabels = {
+    'Traffic': 'การจราจร',
+    'Accident': 'อุบัติเหตุ',
+    'Road Work': 'ซ่อมถนน',
+    'Hazard': 'จุดอันตราย',
+    'Crime': 'เหตุอาชญากรรม',
+    'Emergency': 'เหตุฉุกเฉิน',
+    'Other': 'อื่นๆ',
+  };
+  
+  final Map<String, String> _severityLabels = {
+    'Low': 'ต่ำ',
+    'Medium': 'ปานกลาง',
+    'High': 'สูง',
+    'Critical': 'วิกฤต',
+  };
+
+  String _getCategoryLabel(String value) => _categoryLabels[value] ?? value;
+  String _getSeverityLabel(String value) => _severityLabels[value] ?? value;
 
   @override
   void dispose() {
@@ -93,8 +113,8 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error taking photo: $e'),
+          const SnackBar(
+            content: Text('ไม่สามารถถ่ายภาพได้ กรุณาลองอีกครั้ง'),
             backgroundColor: Colors.red,
           ),
         );
@@ -130,7 +150,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
         'longitude': widget.longitude,
         'imageUrl': imageUrl,
         'reporterId': user.uid,
-        'reporterName': user.displayName ?? 'Anonymous',
+        'reporterName': user.displayName ?? 'ไม่ระบุตัวตน',
         'status': 'pending',
         'timestamp': FieldValue.serverTimestamp(),
         'createdAt': DateTime.now(),
@@ -139,7 +159,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Incident reported successfully'),
+            content: Text('ส่งรายงานเรียบร้อยแล้ว'),
             backgroundColor: Colors.green,
           ),
         );
@@ -149,8 +169,8 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
+          const SnackBar(
+            content: Text('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'),
             backgroundColor: Colors.red,
           ),
         );
@@ -172,7 +192,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
         
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Report Incident'),
+            title: const Text('รายงานเหตุการณ์'),
             backgroundColor: isDark ? Colors.black : Colors.white,
             foregroundColor: isDark ? Colors.white : Colors.black,
             elevation: 1,
@@ -204,7 +224,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Location: ${widget.latitude!.toStringAsFixed(4)}, ${widget.longitude!.toStringAsFixed(4)}',
+                            'พิกัด: ${widget.latitude!.toStringAsFixed(4)}, ${widget.longitude!.toStringAsFixed(4)}',
                             style: TextStyle(
                               color: isDark ? Colors.blue[300] : Colors.blue[700],
                               fontSize: 12,
@@ -217,7 +237,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                 
                 // Category selection
                 Text(
-                  'Incident Category',
+                  'ประเภทเหตุการณ์',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -248,7 +268,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                category,
+                                _getCategoryLabel(category),
                                 style: TextStyle(
                                   color: isDark ? Colors.white : Colors.black,
                                 ),
@@ -269,7 +289,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                 
                 // Severity selection
                 Text(
-                  'Severity Level',
+                  'ระดับความรุนแรง',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -321,7 +341,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                severity,
+                                _getSeverityLabel(severity),
                                 style: TextStyle(
                                   color: isDark ? Colors.white : Colors.black,
                                 ),
@@ -342,7 +362,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                 
                 // Title field
                 Text(
-                  'Title',
+                  'หัวข้อ',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -353,7 +373,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                 TextFormField(
                   controller: _titleController,
                   decoration: InputDecoration(
-                    hintText: 'Enter incident title...',
+                    hintText: 'กรอกชื่อเหตุการณ์...',
                     hintStyle: TextStyle(
                       color: isDark ? Colors.grey[400] : Colors.grey[600],
                     ),
@@ -369,7 +389,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Please enter a title';
+                      return 'กรุณากรอกหัวข้อ';
                     }
                     return null;
                   },
@@ -378,7 +398,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                 
                 // Description field
                 Text(
-                  'Description',
+                  'รายละเอียด',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -390,7 +410,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                   controller: _descriptionController,
                   maxLines: 4,
                   decoration: InputDecoration(
-                    hintText: 'Describe the incident details...',
+                    hintText: 'อธิบายรายละเอียดเหตุการณ์...',
                     hintStyle: TextStyle(
                       color: isDark ? Colors.grey[400] : Colors.grey[600],
                     ),
@@ -406,7 +426,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Please enter description';
+                      return 'กรุณากรอกรายละเอียด';
                     }
                     return null;
                   },
@@ -415,7 +435,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                 
                 // Image picker
                 Text(
-                  'Photo (Optional)',
+                  'รูปภาพ (ไม่จำเป็น)',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -482,7 +502,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Tap to take photo',
+                                'แตะเพื่อถ่ายภาพ',
                                 style: TextStyle(
                                   color: isDark ? Colors.grey[400] : Colors.grey[600],
                                 ),
@@ -517,7 +537,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                             ),
                           )
                         : const Text(
-                            'Submit Report',
+                            'ส่งรายงาน',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

@@ -173,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               navigator.pushReplacementNamed('/main');
                             } on FirebaseAuthException catch (e) {
                               if (!mounted) return;
-                              String errorMessage = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
+                              String errorMessage = 'เกิดข้อผิดพลาด โปรดตรวจสอบข้อมูลและลองอีกครั้ง';
                               
                               if (e.code == 'user-not-found') {
                                 errorMessage = 'ไม่พบผู้ใช้งานอีเมลนี้';

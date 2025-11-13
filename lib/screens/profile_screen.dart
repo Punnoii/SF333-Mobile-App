@@ -44,7 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final data = doc.data() as Map<String, dynamic>;
         // Check if fullName exists, if not, use username or displayName as fallback
         if (data['fullName'] == null || data['fullName'] == '') {
-          data['fullName'] = data['username'] ?? user.displayName ?? 'User';
+          data['fullName'] = data['username'] ?? user.displayName ?? 'ผู้ใช้';
           // Update Firestore with the fallback name
           await FirebaseFirestore.instance
               .collection('users')
@@ -61,8 +61,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .collection('users')
             .doc(user.uid)
             .set({
-          'username': user.displayName ?? 'User',
-          'fullName': user.displayName ?? 'New User',
+          'username': user.displayName ?? 'ผู้ใช้',
+          'fullName': user.displayName ?? 'ผู้ใช้ใหม่',
           'email': user.email ?? '',
           'profileImageUrl': '',
           'phoneNumber': '',
@@ -88,12 +88,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final isDark = themeService.isDarkMode;
     
     if (user == null) {
-      return const Center(child: Text('Please login to view your profile'));
+      return const Center(child: Text('กรุณาเข้าสู่ระบบเพื่อดูโปรไฟล์ของคุณ'));
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Text('โปรไฟล์', style: TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: isDark ? Colors.black : Colors.white,
         elevation: 0,
         actions: [
@@ -171,7 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 final userData = snapshot.data?.data() as Map<String, dynamic>?;
-                final displayName = userData?['username'] ?? userData?['fullName'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'User';
+                final displayName = userData?['username'] ?? userData?['fullName'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'ผู้ใช้';
                 
                 return Text(
                   displayName,
@@ -181,7 +181,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              user.email ?? 'No email',
+              user.email ?? 'ไม่มีอีเมล',
               style: TextStyle(fontSize: 16, color: isDark ? Colors.grey[400] : Colors.grey[600]),
             ),
             const SizedBox(height: 32),
@@ -210,7 +210,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Icon(Icons.analytics_outlined, color: Colors.tealAccent, size: 24),
                       const SizedBox(width: 8),
                       const Text(
-                        'Activity Stats',
+                        'สถิติกิจกรรม',
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ],
@@ -223,18 +223,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         .snapshots(),
                     builder: (context, snapshot) {
                       final postCount = snapshot.data?.docs.length ?? 0;
-                      return _buildActivityItem('Posts', '$postCount');
+                      return _buildActivityItem('โพสต์', '$postCount');
                     },
                   ),
                   StreamBuilder<int>(
                     stream: _getCommentCountStream(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return _buildActivityItem('Comments', '...');
+                        return _buildActivityItem('ความคิดเห็น', '...');
                       }
                       
                       final commentCount = snapshot.data ?? 0;
-                      return _buildActivityItem('Comments', '$commentCount');
+                      return _buildActivityItem('ความคิดเห็น', '$commentCount');
                     },
                   ),
                   StreamBuilder<QuerySnapshot>(
@@ -250,7 +250,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           totalLikes += (data['likes'] as int? ?? 0);
                         }
                       }
-                      return _buildActivityItem('Total Likes', '$totalLikes');
+                      return _buildActivityItem('ยอดถูกใจรวม', '$totalLikes');
                     },
                   ),
                 ],
@@ -287,7 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Icon(Icons.accessibility_new, color: Colors.tealAccent, size: 20),
                           const SizedBox(width: 8),
                           Text(
-                            'Accessibility Information',
+                            'ข้อมูลการเข้าถึง',
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
                           ),
                         ],

@@ -42,13 +42,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
         
         if (user == null) {
           return const Scaffold(
-            body: Center(child: Text('Please log in')),
+            body: Center(child: Text('กรุณาเข้าสู่ระบบ')),
           );
         }
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.w600)),
+            title: const Text('แชท', style: TextStyle(fontWeight: FontWeight.w600)),
             backgroundColor: isDark ? Colors.black : Colors.white,
             elevation: 0,
             actions: [
@@ -67,7 +67,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
+                return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดรายการแชท'));
               }
 
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -97,9 +97,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     children: [
                       Icon(Icons.chat_bubble_outline, size: 64, color: isDark ? Colors.grey[600] : Colors.grey[500]),
                       const SizedBox(height: 16),
-                      Text('No chats yet', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.grey[700])),
+                      Text('ยังไม่มีการสนทนา', style: TextStyle(fontSize: 18, color: isDark ? Colors.grey[400] : Colors.grey[700])),
                       const SizedBox(height: 8),
-                      Text('Start a conversation!', style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[500] : Colors.grey[600])),
+                      Text('เริ่มต้นพูดคุยกันเลย!', style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[500] : Colors.grey[600])),
                     ],
                   ),
                 );
@@ -122,12 +122,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       if (!userSnapshot.hasData) {
                         return const ListTile(
                           leading: CircleAvatar(child: Icon(Icons.person)),
-                          title: Text('Loading...'),
+                          title: Text('กำลังโหลด...'),
                         );
                       }
 
                       final userData = userSnapshot.data;
-                      final otherUserName = userData?['fullName'] ?? userData?['username'] ?? 'Unknown User';
+                      final otherUserName = userData?['fullName'] ?? userData?['username'] ?? 'ไม่ทราบชื่อผู้ใช้';
                       final profileImageUrl = userData?['profileImageUrl'];
 
                       return Card(
@@ -161,7 +161,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           subtitle: Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              data['lastMessage'] ?? 'No messages yet',
+                              data['lastMessage'] ?? 'ยังไม่มีข้อความ',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 14),
@@ -286,7 +286,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: isDark ? Colors.grey[900] : Colors.white,
         title: Text(
-          'Start New Chat',
+          'เริ่มแชตใหม่',
           style: TextStyle(color: isDark ? Colors.white : Colors.black87),
         ),
         content: Column(
@@ -296,7 +296,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               controller: emailController,
               style: TextStyle(color: isDark ? Colors.white : Colors.black87),
               decoration: InputDecoration(
-                hintText: 'Enter email or full name',
+                hintText: 'กรอกอีเมล หรือ ชื่อ-นามสกุล',
                 hintStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
                 border: OutlineInputBorder(
                   borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[400]!),
@@ -307,7 +307,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: isDark ? Colors.tealAccent : Colors.teal),
                 ),
-                helperText: 'You can search by email or full name',
+                helperText: 'สามารถค้นหาด้วยอีเมลหรือชื่อเต็มได้',
                 helperStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[600]),
               ),
             ),
@@ -317,7 +317,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
-              'Cancel',
+              'ยกเลิก',
               style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
             ),
           ),
@@ -328,7 +328,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               navigator.pop();
             },
             child: Text(
-              'Start Chat',
+              'เริ่มต้นการแชต',
               style: TextStyle(color: isDark ? Colors.tealAccent : Colors.teal),
             ),
           ),
@@ -371,7 +371,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       if (userQuery.docs.isEmpty) {
         if (!mounted) return;
         messenger.showSnackBar(
-          const SnackBar(content: Text('User not found')),
+          const SnackBar(content: Text('ไม่พบผู้ใช้งานที่ค้นหา')),
         );
         return;
       }
@@ -413,7 +413,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         MaterialPageRoute(
           builder: (_) => ChatScreen(
             chatId: chatId!,
-            otherUserName: userData['username'] ?? userData['fullName'] ?? userData['email']?.split('@')[0] ?? 'Unknown',
+            otherUserName: userData['username'] ?? userData['fullName'] ?? userData['email']?.split('@')[0] ?? 'ไม่ทราบชื่อผู้ใช้',
             otherUserId: otherUserId,
           ),
         ),
@@ -421,7 +421,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Error starting chat: $e')),
+        const SnackBar(content: Text('ไม่สามารถเริ่มการแชตได้ กรุณาลองใหม่อีกครั้ง')),
       );
     }
   }
