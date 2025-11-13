@@ -8,9 +8,12 @@ import 'logging_service.dart';
 class LocationService {
   static const String _logCategory = 'LocationService';
   static const String _nominatimBaseUrl = 'https://nominatim.openstreetmap.org/search';
+  static const String _nominatimReverseUrl = 'https://nominatim.openstreetmap.org/reverse';
   static const Duration _timeout = Duration(seconds: 3);
   static const String _cachePrefix = 'location_cache_';
+  static const String _reverseCachePrefix = 'location_reverse_cache_';
   static const Duration _cacheExpiry = Duration(hours: 24);
+  static const Duration _reverseCacheExpiry = Duration(hours: 24);
   
   // Configuration - set to false to disable API calls temporarily
   static bool _enableApiSearch = false;
@@ -18,6 +21,7 @@ class LocationService {
   
   static String _lastQuery = '';
   static List<Map<String, dynamic>> _lastResults = [];
+  static final Map<String, Map<String, dynamic>> _memoryReverseCache = {};
 
   /// Allow overriding runtime configuration for testing or feature flags.
   @visibleForTesting
@@ -31,6 +35,11 @@ class LocationService {
     if (httpClient != null) {
       _httpClient = httpClient;
     }
+  }
+
+  /// Runtime hook for enabling or disabling the external search API
+  static void setApiSearchEnabled(bool enabled) {
+    _enableApiSearch = enabled;
   }
 
   @visibleForTesting
@@ -68,7 +77,7 @@ class LocationService {
     
     try {
       final encodedQuery = Uri.encodeComponent('$cleanQuery Thailand');
-      final url = '$_nominatimBaseUrl?q=$encodedQuery&format=json&limit=10&countrycodes=th&addressdetails=1';
+      final url = '$_nominatimBaseUrl?q=$encodedQuery&format=json&limit=10&countrycodes=th&addressdetails=1&accept-language=th';
       
       final response = await _httpClient
           .get(
@@ -76,6 +85,7 @@ class LocationService {
             headers: {
               'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)',
               'Accept': 'application/json',
+              'Accept-Language': 'th',
             },
           )
           .timeout(_timeout);
@@ -139,6 +149,80 @@ class LocationService {
     return [];
   }
 
+  /// Reverse geocode coordinates into a human-readable Thai address
+  static Future<Map<String, dynamic>?> reverseGeocode(double latitude, double longitude) async {
+    final key = '${latitude.toStringAsFixed(5)},${longitude.toStringAsFixed(5)}';
+    
+    // In-memory cache to avoid repeated lookups in same session
+    if (_memoryReverseCache.containsKey(key)) {
+      return _memoryReverseCache[key];
+    }
+    
+    final cachedResult = await _getCachedReverseResult(key);
+    if (cachedResult != null) {
+      _memoryReverseCache[key] = cachedResult;
+      return cachedResult;
+    }
+    
+    final url = '$_nominatimReverseUrl?format=json&lat=$latitude&lon=$longitude&zoom=18&addressdetails=1&accept-language=th';
+    
+    try {
+      final response = await _httpClient
+          .get(
+            Uri.parse(url),
+            headers: {
+              'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)',
+              'Accept': 'application/json',
+              'Accept-Language': 'th',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final Map<String, dynamic>? address = data['address'] != null
+            ? Map<String, dynamic>.from(data['address'])
+            : null;
+        final formattedAddress = data['display_name']?.toString();
+
+        final result = {
+          'formattedAddress': formattedAddress,
+          'houseNumber': address?['house_number'],
+          'road': address?['road'] ?? address?['street'] ?? address?['residential'],
+          'subdistrict': address?['suburb'] ?? address?['quarter'] ?? address?['village'] ?? address?['hamlet'],
+          'district': address?['city_district'] ?? address?['district'] ?? address?['county'] ?? address?['city'],
+          'province': address?['state'] ?? address?['region'],
+          'postcode': address?['postcode'],
+          'country': address?['country'] ?? 'Thailand',
+          'raw': address,
+        };
+
+        _memoryReverseCache[key] = result;
+        await _cacheReverseResult(key, result);
+        return result;
+      } else {
+        LoggingService.warning(
+          'Nominatim reverse API failed with status: ${response.statusCode}',
+          category: _logCategory,
+        );
+      }
+    } on TimeoutException {
+      LoggingService.warning(
+        'Nominatim reverse API timeout - returning null',
+        category: _logCategory,
+      );
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error performing reverse geocode',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
+    }
+
+    return null;
+  }
+
   /// Categorize places based on OpenStreetMap tags
   static String _categorizePlace(Map<String, dynamic> item) {
     final type = item['type']?.toString().toLowerCase() ?? '';
@@ -178,6 +262,24 @@ class LocationService {
       );
     }
   }
+
+  static Future<void> _cacheReverseResult(String key, Map<String, dynamic> result) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheData = {
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'result': result,
+      };
+      await prefs.setString('$_reverseCachePrefix$key', json.encode(cacheData));
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error caching reverse geocode result',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
+    }
+  }
   
   /// Get cached results if they exist and are not expired
   static Future<List<Map<String, dynamic>>> _getCachedResults(String query) async {
@@ -210,6 +312,28 @@ class LocationService {
     
     return [];
   }
+
+  static Future<Map<String, dynamic>?> _getCachedReverseResult(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedString = prefs.getString('$_reverseCachePrefix$key');
+      if (cachedString == null) return null;
+      final cacheData = json.decode(cachedString);
+      final timestamp = cacheData['timestamp'] as int;
+      final cacheTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      if (DateTime.now().difference(cacheTime) < _reverseCacheExpiry) {
+        return Map<String, dynamic>.from(cacheData['result'] as Map);
+      }
+    } catch (e, stack) {
+      LoggingService.error(
+        'Error reading reverse geocode cache',
+        error: e,
+        stackTrace: stack,
+        category: _logCategory,
+      );
+    }
+    return null;
+  }
   
   /// Clear old cache entries
   static Future<void> clearExpiredCache() async {
@@ -225,6 +349,18 @@ class LocationService {
           final cacheTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
           
           if (DateTime.now().difference(cacheTime) >= _cacheExpiry) {
+            await prefs.remove(key);
+          }
+        }
+      }
+      final reverseKeys = prefs.getKeys().where((key) => key.startsWith(_reverseCachePrefix));
+      for (final key in reverseKeys) {
+        final cachedString = prefs.getString(key);
+        if (cachedString != null) {
+          final cacheData = json.decode(cachedString);
+          final timestamp = cacheData['timestamp'] as int;
+          final cacheTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+          if (DateTime.now().difference(cacheTime) >= _reverseCacheExpiry) {
             await prefs.remove(key);
           }
         }

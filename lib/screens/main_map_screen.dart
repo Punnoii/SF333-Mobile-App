@@ -237,11 +237,13 @@ class _MainMapScreenState extends State<MainMapScreen> {
   }
   
   Future<void> _performStaticSearch(String query) async {
+    final cleanedQuery = query.trim();
+    
     // Search incidents
-    final incidentResults = await _searchIncidents(query);
+    final incidentResults = await _searchIncidents(cleanedQuery);
     
     // Search places from static database only
-    final staticLocationResults = await _searchPlaces(query);
+    final staticLocationResults = await _searchPlaces(cleanedQuery);
     
     // Show static results immediately
     final staticResults = [...incidentResults, ...staticLocationResults];
@@ -253,17 +255,19 @@ class _MainMapScreenState extends State<MainMapScreen> {
   }
   
   Future<void> _performSearch(String query) async {
+    final cleanedQuery = query.trim();
+
     // Search incidents
-    final incidentResults = await _searchIncidents(query);
+    final incidentResults = await _searchIncidents(cleanedQuery);
     
     // Search places from static database
-    final staticLocationResults = await _searchPlaces(query);
+    final staticLocationResults = await _searchPlaces(cleanedQuery);
     
-    // Search places from external API (Nominatim) - only if query is longer than 3 characters
+    // Search places from external API (Nominatim) for queries with at least 2 characters
     List<Map<String, dynamic>> apiLocationResults = [];
-    if (query.length > 3) {
+    if (cleanedQuery.length >= 2) {
       try {
-        apiLocationResults = await _searchPlacesFromAPI(query);
+        apiLocationResults = await _searchPlacesFromAPI(cleanedQuery);
       } catch (e, stack) {
         LoggingService.error(
           'API search failed, using static database only',

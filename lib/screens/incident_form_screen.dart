@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'dart:io';
 import '../services/theme_service.dart';
 import '../services/cloudinary_service.dart';
+import '../services/location_service.dart';
+import '../services/logging_service.dart';
 
 class IncidentFormScreen extends StatefulWidget {
   final double? latitude;
@@ -140,8 +142,27 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
         imageUrl = await CloudinaryService.uploadProfileImage(_selectedImage!, user.uid);
       }
       
-      // Create incident document
-      await FirebaseFirestore.instance.collection('incidents').add({
+      Map<String, dynamic>? addressData;
+      String? formattedAddress;
+
+      if (widget.latitude != null && widget.longitude != null) {
+        try {
+          addressData = await LocationService.reverseGeocode(
+            widget.latitude!,
+            widget.longitude!,
+          );
+          formattedAddress = addressData?['formattedAddress'] as String?;
+        } catch (e, stack) {
+          LoggingService.error(
+            'Reverse geocode failed, proceeding with coordinates only',
+            error: e,
+            stackTrace: stack,
+            category: 'IncidentForm',
+          );
+        }
+      }
+
+      final incidentData = {
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'category': _selectedCategory,
@@ -154,7 +175,17 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
         'status': 'pending',
         'timestamp': FieldValue.serverTimestamp(),
         'createdAt': DateTime.now(),
-      });
+      };
+
+      if (formattedAddress != null && formattedAddress.isNotEmpty) {
+        incidentData['formattedAddress'] = formattedAddress;
+      }
+      if (addressData != null && addressData.isNotEmpty) {
+        incidentData['address'] = addressData;
+      }
+
+      // Create incident document
+      await FirebaseFirestore.instance.collection('incidents').add(incidentData);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

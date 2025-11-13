@@ -12,9 +12,13 @@ import 'screens/edit_profile_screen.dart';
 import 'services/theme_service.dart';
 import 'services/notification_service.dart';
 import 'services/logging_service.dart';
+import 'services/location_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Ensure location search API is enabled even if initialization fails later
+  LocationService.setApiSearchEnabled(true);
   
   try {
     // Load environment variables with timeout

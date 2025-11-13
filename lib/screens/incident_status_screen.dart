@@ -25,11 +25,21 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
   Position? _currentPosition;
   bool _isLoadingLocation = false;
   String _selectedStatus = 'all';
+  String _searchQuery = '';
+  bool _onlyNearby = false;
+  final double _nearbyRadiusKm = 10;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -70,6 +80,9 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
     } finally {
       setState(() {
         _isLoadingLocation = false;
+        if (_currentPosition == null) {
+          _onlyNearby = false;
+        }
       });
     }
   }
@@ -229,31 +242,114 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
         .snapshots();
   }
 
+  double? _calculateDistanceKm(dynamic lat, dynamic lng) {
+    if (_currentPosition == null || lat is! num || lng is! num) return null;
+    const double earthRadius = 6371;
+    final double latDiff = _degreesToRadians(lat.toDouble() - _currentPosition!.latitude);
+    final double lngDiff = _degreesToRadians(lng.toDouble() - _currentPosition!.longitude);
+    final double a = sin(latDiff / 2) * sin(latDiff / 2) +
+        cos(_degreesToRadians(_currentPosition!.latitude)) * cos(_degreesToRadians(lat.toDouble())) *
+            sin(lngDiff / 2) * sin(lngDiff / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  double _degreesToRadians(double degrees) {
+    return degrees * (pi / 180);
+  }
+
   Widget _buildFilterControls(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.filter_list, size: 20),
-          const SizedBox(width: 8),
-          const Text('สถานะ: '),
-          Expanded(
-            child: DropdownButton<String>(
-              value: _selectedStatus,
-              isExpanded: true,
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('ทั้งหมด')),
-                DropdownMenuItem(value: 'reported', child: Text('รอการตรวจสอบ')),
-                DropdownMenuItem(value: 'in_progress', child: Text('กำลังดำเนินการ')),
-                DropdownMenuItem(value: 'resolved', child: Text('แก้ไขแล้ว')),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  _selectedStatus = value!;
-                });
-              },
-            ),
+          Row(
+            children: [
+              const Icon(Icons.filter_list, size: 20),
+              const SizedBox(width: 8),
+              const Text('สถานะ: '),
+              Expanded(
+                child: DropdownButton<String>(
+                  value: _selectedStatus,
+                  isExpanded: true,
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('ทั้งหมด')),
+                    DropdownMenuItem(value: 'reported', child: Text('รอการตรวจสอบ')),
+                    DropdownMenuItem(value: 'in_progress', child: Text('กำลังดำเนินการ')),
+                    DropdownMenuItem(value: 'resolved', child: Text('แก้ไขแล้ว')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedStatus = value!;
+                    });
+                  },
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'ค้นหาหมุดหรือที่อยู่',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        setState(() {
+                          _searchQuery = '';
+                          _searchController.clear();
+                        });
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: isDark ? Colors.grey[900] : Colors.grey[100],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'เฉพาะเหตุภายใน ${_nearbyRadiusKm.toStringAsFixed(0)} กม. รอบตำแหน่งฉัน',
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[300] : Colors.black87,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              Switch.adaptive(
+                value: _onlyNearby && _currentPosition != null,
+                onChanged: _currentPosition == null
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _onlyNearby = value;
+                        });
+                      },
+              ),
+            ],
+          ),
+          if (_currentPosition == null)
+            Text(
+              'เปิดการระบุตำแหน่งเพื่อใช้ตัวกรองรัศมี',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.grey[500] : Colors.grey[600],
+              ),
+            ),
         ],
       ),
     );
@@ -337,38 +433,84 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                   // Filter by status if not 'all'
                   List<QueryDocumentSnapshot> filteredIncidents = incidents;
                   if (_selectedStatus != 'all') {
-                    filteredIncidents = incidents.where((incident) {
+                    filteredIncidents = filteredIncidents.where((incident) {
                       final data = incident.data() as Map<String, dynamic>;
                       final status = data['status'] ?? 'pending';
                       return status == _selectedStatus;
                     }).toList();
                   }
 
+                  final query = _searchQuery.trim().toLowerCase();
+                  if (query.isNotEmpty) {
+                    filteredIncidents = filteredIncidents.where((incident) {
+                      final data = incident.data() as Map<String, dynamic>;
+                      final searchable = <String?>[
+                        data['title']?.toString(),
+                        data['description']?.toString(),
+                        data['formattedAddress']?.toString(),
+                      ];
+                      final address = data['address'];
+                      if (address is Map<String, dynamic>) {
+                        searchable.addAll([
+                          address['houseNumber']?.toString(),
+                          address['road']?.toString(),
+                          address['subdistrict']?.toString(),
+                          address['district']?.toString(),
+                          address['province']?.toString(),
+                        ]);
+                      }
+                      return searchable.whereType<String>().any((value) => value.toLowerCase().contains(query));
+                    }).toList();
+                  }
+
+                  if (_onlyNearby && _currentPosition != null) {
+                    filteredIncidents = filteredIncidents.where((incident) {
+                      final data = incident.data() as Map<String, dynamic>;
+                      final distance = _calculateDistanceKm(data['latitude'], data['longitude']);
+                      return distance != null && distance <= _nearbyRadiusKm;
+                    }).toList();
+                  }
+
                   if (filteredIncidents.isEmpty) {
+                    String emptyMessage = 'ยังไม่มีการแจ้งเหตุของคุณ';
+                    if (query.isNotEmpty || (_onlyNearby && _currentPosition != null)) {
+                      emptyMessage = 'ไม่พบเหตุที่ตรงกับคำค้นหาหรือรัศมีที่เลือก';
+                    } else if (_selectedStatus != 'all') {
+                      emptyMessage = 'ไม่พบเหตุสถานะ ${_getStatusText(_selectedStatus)}';
+                    }
                     return Center(
                       child: Text(
-                        _selectedStatus == 'all' 
-                          ? 'ยังไม่มีการแจ้งเหตุของคุณ'
-                          : 'ไม่พบเหตุสถานะ ${_getStatusText(_selectedStatus)}',
+                        emptyMessage,
                         style: TextStyle(
                           fontSize: 16,
                           color: isDark ? Colors.grey[600] : Colors.black54,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     );
                   }
 
-                  // Always sort incidents by timestamp (descending order - newest first)
-                  filteredIncidents.sort((a, b) {
-                    final aTimestamp = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-                    final bTimestamp = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-                    
-                    if (aTimestamp == null && bTimestamp == null) return 0;
-                    if (aTimestamp == null) return 1;
-                    if (bTimestamp == null) return -1;
-                    
-                    return bTimestamp.compareTo(aTimestamp); // Descending order
-                  });
+                  if (_onlyNearby && _currentPosition != null) {
+                    filteredIncidents.sort((a, b) {
+                      final dataA = a.data() as Map<String, dynamic>;
+                      final dataB = b.data() as Map<String, dynamic>;
+                      final distanceA = _calculateDistanceKm(dataA['latitude'], dataA['longitude']) ?? double.infinity;
+                      final distanceB = _calculateDistanceKm(dataB['latitude'], dataB['longitude']) ?? double.infinity;
+                      return distanceA.compareTo(distanceB);
+                    });
+                  } else {
+                    // Always sort incidents by timestamp (descending order - newest first)
+                    filteredIncidents.sort((a, b) {
+                      final aTimestamp = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+                      final bTimestamp = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+                      
+                      if (aTimestamp == null && bTimestamp == null) return 0;
+                      if (aTimestamp == null) return 1;
+                      if (bTimestamp == null) return -1;
+                      
+                      return bTimestamp.compareTo(aTimestamp); // Descending order
+                    });
+                  }
 
                   return ListView.builder(
                     itemCount: filteredIncidents.length,
@@ -443,6 +585,41 @@ class _IncidentCard extends StatelessWidget {
 
   double _degreesToRadians(double degrees) {
     return degrees * (pi / 180);
+  }
+
+  String? _getReadableAddress() {
+    final formatted = data['formattedAddress'];
+    if (formatted is String && formatted.trim().isNotEmpty) {
+      return formatted;
+    }
+    final address = data['address'];
+    if (address is Map<String, dynamic>) {
+      final parts = [
+        address['houseNumber'],
+        address['road'],
+        address['subdistrict'],
+        address['district'],
+        address['province'],
+        address['postcode'],
+      ]
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+      if (parts.isNotEmpty) {
+        return parts.join(' ');
+      }
+    }
+    return null;
+  }
+
+  String? _getCoordinateText() {
+    final lat = data['latitude'];
+    final lng = data['longitude'];
+    if (lat is num && lng is num) {
+      return 'ละติจูด ${lat.toStringAsFixed(4)}, ลองจิจูด ${lng.toStringAsFixed(4)}';
+    }
+    return null;
   }
 
   String _getStatusText(String status) {
@@ -566,6 +743,25 @@ class _IncidentCard extends StatelessWidget {
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (_getReadableAddress() != null || _getCoordinateText() != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 16, color: isDark ? Colors.red[200] : Colors.red),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _getReadableAddress() ?? _getCoordinateText()!,
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[300] : Colors.grey[700],
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty) ...[
                   const SizedBox(height: 12),
                   ClipRRect(

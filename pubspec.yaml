@@ -73,7 +73,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   
-  # Add .env file as an asset
+  # Add .env file as an asset so flutter_dotenv can load it at runtime.
   assets:
     - .env
 

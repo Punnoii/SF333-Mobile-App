@@ -17,6 +17,4 @@ class AppConfig {
   static String get cloudinaryUploadPreset => dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
   static String get cloudinaryBaseImagePath =>
       dotenv.env['CLOUDINARY_BASE_IMAGE_PATH'] ?? 'paisabai';
-  // Notification configuration
-  static String get fcmServerKey => dotenv.env['FCM_SERVER_KEY'] ?? '';
 }

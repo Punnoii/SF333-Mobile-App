@@ -1,1 +1,43 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"paisabaiproject","appId":"1:899471675960:android:7b733835885ddf5e454ccd","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"paisabaiproject","appId":"1:899471675960:ios:97371700b13bc3d4454ccd","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"paisabaiproject","appId":"1:899471675960:ios:97371700b13bc3d4454ccd","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"paisabaiproject","configurations":{"android":"1:899471675960:android:7b733835885ddf5e454ccd","ios":"1:899471675960:ios:97371700b13bc3d4454ccd","macos":"1:899471675960:ios:97371700b13bc3d4454ccd","web":"1:899471675960:web:3b9092a7ec03aa62454ccd"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "paisabaiproject",
+          "appId": "1:899471675960:android:7b733835885ddf5e454ccd",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "paisabaiproject",
+          "appId": "1:899471675960:ios:97371700b13bc3d4454ccd",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "paisabaiproject",
+          "appId": "1:899471675960:ios:97371700b13bc3d4454ccd",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "paisabaiproject",
+          "configurations": {
+            "android": "1:899471675960:android:7b733835885ddf5e454ccd",
+            "ios": "1:899471675960:ios:97371700b13bc3d4454ccd",
+            "macos": "1:899471675960:ios:97371700b13bc3d4454ccd",
+            "web": "1:899471675960:web:3b9092a7ec03aa62454ccd"
+          }
+        }
+      }
+    }
+  }
+}

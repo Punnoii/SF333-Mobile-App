@@ -89,6 +89,44 @@ class IncidentDetailScreen extends StatelessWidget {
     }
   }
 
+  String? _getReadableAddress() {
+    final formatted = incident['formattedAddress'];
+    if (formatted is String && formatted.trim().isNotEmpty) {
+      return formatted;
+    }
+
+    final rawAddress = incident['address'];
+    if (rawAddress is Map<String, dynamic>) {
+      final parts = [
+        rawAddress['houseNumber'],
+        rawAddress['road'],
+        rawAddress['subdistrict'],
+        rawAddress['district'],
+        rawAddress['province'],
+        rawAddress['postcode'],
+      ]
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+
+      if (parts.isNotEmpty) {
+        return parts.join(' ');
+      }
+    }
+
+    return null;
+  }
+
+  String? _getCoordinateText() {
+    final lat = incident['latitude'];
+    final lng = incident['longitude'];
+    if (lat is num && lng is num) {
+      return 'ละติจูด ${lat.toStringAsFixed(4)}, ลองจิจูด ${lng.toStringAsFixed(4)}';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final reportedAt = incident['reportedAt'] as Timestamp? ?? incident['timestamp'] as Timestamp?;
@@ -97,6 +135,8 @@ class IncidentDetailScreen extends StatelessWidget {
     final isOwner = currentUser?.uid == incident['reportedBy'];
     final themeService = Provider.of<ThemeService>(context);
     final isDark = themeService.isDarkMode;
+    final addressText = _getReadableAddress();
+    final coordinateText = _getCoordinateText();
     
     return Scaffold(
       appBar: AppBar(
@@ -176,17 +216,23 @@ class IncidentDetailScreen extends StatelessWidget {
             const SizedBox(height: 8),
             
             // Location
-            Row(
-              children: [
-                const Icon(Icons.location_on, color: Colors.red, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  'ละติจูด ${incident['latitude']?.toStringAsFixed(4)}, ลองจิจูด ${incident['longitude']?.toStringAsFixed(4)}',
-                  style: TextStyle(color: isDark ? Colors.grey : Colors.black54),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
+            if (addressText != null || coordinateText != null) ...[
+              Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.red, size: 16),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      addressText ?? coordinateText!,
+                      style: TextStyle(color: isDark ? Colors.grey : Colors.black54),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
             
             // Reported by and time
             FutureBuilder<DocumentSnapshot>(

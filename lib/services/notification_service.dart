@@ -1,12 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 import 'dart:io';
-import '../config/app_config.dart';
 import 'logging_service.dart';
 
 class NotificationService {
@@ -212,7 +209,9 @@ class NotificationService {
       return;
     }
 
-    // Store notification data for auditing/inbox purposes
+    // Store notification data for auditing/inbox purposes.
+    // A backend process (e.g. Cloud Function) should watch this collection and
+    // deliver the actual push via the server-side FCM Admin SDK.
     await FirebaseFirestore.instance.collection('notifications').add({
       'recipientId': recipientId,
       'senderId': FirebaseAuth.instance.currentUser?.uid,
@@ -223,67 +222,10 @@ class NotificationService {
       'read': false,
       'fcmToken': fcmToken,
     });
-
-    await _sendPushMessage(
-      token: fcmToken,
-      title: senderName,
-      body: message,
-      chatId: chatId,
+    LoggingService.info(
+      'Queued push notification for user $recipientId via backend processor.',
+      category: _logCategory,
     );
-  }
-
-  static Future<void> _sendPushMessage({
-    required String token,
-    required String title,
-    required String body,
-    required String chatId,
-  }) async {
-    final serverKey = AppConfig.fcmServerKey;
-    if (serverKey.isEmpty) {
-      LoggingService.warning(
-        'FCM server key missing. Unable to send push notification.',
-        category: _logCategory,
-      );
-      return;
-    }
-
-    try {
-      final response = await http
-          .post(
-            Uri.parse('https://fcm.googleapis.com/fcm/send'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'key=$serverKey',
-            },
-            body: jsonEncode({
-              'to': token,
-              'notification': {
-                'title': title,
-                'body': body.isEmpty ? 'You have a new message' : body,
-                'sound': 'default',
-              },
-              'data': {
-                'chatId': chatId,
-                'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-              },
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        LoggingService.warning(
-          'FCM push failed (${response.statusCode}): ${response.body}',
-          category: _logCategory,
-        );
-      }
-    } catch (e, stack) {
-      LoggingService.error(
-        'Error sending FCM push',
-        error: e,
-        stackTrace: stack,
-        category: _logCategory,
-      );
-    }
   }
 }
 

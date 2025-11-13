@@ -1,0 +1,104 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isModerator() {
+      return request.auth != null &&
+        (request.auth.token.isModerator == true || request.auth.token.admin == true);
+    }
+
+    function ownsIncident() {
+      return request.auth != null && resource.data.reporterId == request.auth.uid;
+    }
+
+    function validIncidentKeys(data) {
+      return data.keys().hasOnly([
+        'title',
+        'description',
+        'category',
+        'severity',
+        'latitude',
+        'longitude',
+        'imageUrl',
+        'reporterId',
+        'reporterName',
+        'reporterEmail',
+        'status',
+        'timestamp',
+        'createdAt',
+        'reportedAt',
+        'updatedAt',
+        'formattedAddress',
+        'address',
+        'fixerId',
+        'fixerEmail',
+        'fixerImageUrl',
+        'fixerDetails',
+        'assignedUnit',
+      ]);
+    }
+
+    function validCategory(category) {
+      return category in ['Traffic', 'Accident', 'Road Work', 'Hazard', 'Crime', 'Emergency', 'Other'];
+    }
+
+    function validSeverity(severity) {
+      return severity in ['Low', 'Medium', 'High', 'Critical'];
+    }
+
+    function validStatus(status) {
+      return status in ['pending', 'in_progress', 'resolved', 'completed', 'closed'];
+    }
+
+    function baseIncidentSchema(data) {
+      return validIncidentKeys(data) &&
+        data.keys().hasAll(['title', 'description', 'category', 'severity', 'reporterId', 'reporterName', 'status']) &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 140 &&
+        data.description is string && data.description.size() > 0 &&
+        data.category is string && validCategory(data.category) &&
+        data.severity is string && validSeverity(data.severity) &&
+        data.reporterId is string && data.reporterId.size() > 0 &&
+        data.reporterName is string && data.reporterName.size() > 0 &&
+        data.status is string && validStatus(data.status) &&
+        (!('latitude' in data) || data.latitude is number || data.latitude == null) &&
+        (!('longitude' in data) || data.longitude is number || data.longitude == null) &&
+        (!('imageUrl' in data) || data.imageUrl is string || data.imageUrl == null) &&
+        (!('formattedAddress' in data) || data.formattedAddress is string || data.formattedAddress == null) &&
+        (!('address' in data) || data.address is map || data.address == null) &&
+        (!('reporterEmail' in data) || data.reporterEmail is string || data.reporterEmail == null) &&
+        (!('timestamp' in data) || data.timestamp is timestamp) &&
+        (!('createdAt' in data) || data.createdAt is timestamp) &&
+        (!('reportedAt' in data) || data.reportedAt is timestamp) &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function userEditableKeys() {
+      return ['title', 'description', 'imageUrl'];
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if true;
+
+      allow create: if isSignedIn() &&
+        request.resource.data.reporterId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        baseIncidentSchema(request.resource.data);
+
+      allow update: if isSignedIn() && (
+        (isModerator() && baseIncidentSchema(request.resource.data)) ||
+        (!isModerator() && ownsIncident() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(userEditableKeys()) &&
+          request.resource.data.status == resource.data.status &&
+          request.resource.data.category == resource.data.category &&
+          request.resource.data.severity == resource.data.severity &&
+          baseIncidentSchema(request.resource.data))
+      );
+
+      allow delete: if isModerator();
+    }
+  }
+}

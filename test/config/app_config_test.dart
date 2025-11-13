@@ -27,7 +27,6 @@ void main() {
       'FIREBASE_BUNDLE_IOS_ID': 'bundle-ios',
       'CLOUDINARY_CLOUD_NAME': 'demo',
       'CLOUDINARY_UPLOAD_PRESET': 'upload-preset',
-      'FCM_SERVER_KEY': 'server-key',
     });
 
     expect(AppConfig.firebaseApiKeyWeb, 'web-key');
@@ -42,7 +41,6 @@ void main() {
     expect(AppConfig.firebasebundleiosId, 'bundle-ios');
     expect(AppConfig.cloudinaryCloudName, 'demo');
     expect(AppConfig.cloudinaryUploadPreset, 'upload-preset');
-    expect(AppConfig.fcmServerKey, 'server-key');
   });
 
   test('falls back to empty strings when variables are missing', () {
@@ -58,6 +56,5 @@ void main() {
     expect(AppConfig.firebasebundleiosId, isEmpty);
     expect(AppConfig.cloudinaryCloudName, isEmpty);
     expect(AppConfig.cloudinaryUploadPreset, isEmpty);
-    expect(AppConfig.fcmServerKey, isEmpty);
   });
 }
