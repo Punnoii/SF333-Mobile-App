@@ -5,16 +5,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
 import 'logging_service.dart';
+import 'monitoring_service.dart';
 
 class NotificationService {
   static const String _logCategory = 'NotificationService';
   static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   
-  static Future<void> initialize() async {
-    await _initializeLocalNotifications();
-    await _setupFirebaseMessaging();
-    await _requestIOSPermissions();
+  static Future<void> initialize() {
+    return ServiceJobScope.run('NotificationService.initialize', () async {
+      await _initializeLocalNotifications();
+      await _setupFirebaseMessaging();
+      await _requestIOSPermissions();
+    });
   }
   
   static Future<void> _initializeLocalNotifications() async {
@@ -192,40 +195,38 @@ class NotificationService {
     required String senderName,
     required String message,
     required String chatId,
-  }) async {
-    // Get recipient's FCM token
-    final recipientDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(recipientId)
-        .get();
-    
-    final fcmToken = recipientDoc.data()?['fcmToken'] as String?;
-    
-    if (fcmToken == null || fcmToken.isEmpty) {
-      LoggingService.warning(
-        'No FCM token for user $recipientId, skip push notification',
+  }) {
+    return ServiceJobScope.run('NotificationService.sendChatNotification', () async {
+      final recipientDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(recipientId)
+          .get();
+      
+      final fcmToken = recipientDoc.data()?['fcmToken'] as String?;
+      
+      if (fcmToken == null || fcmToken.isEmpty) {
+        LoggingService.warning(
+          'No FCM token for user $recipientId, skip push notification',
+          category: _logCategory,
+        );
+        return;
+      }
+
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'recipientId': recipientId,
+        'senderId': FirebaseAuth.instance.currentUser?.uid,
+        'senderName': senderName,
+        'message': message,
+        'chatId': chatId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'fcmToken': fcmToken,
+      });
+      LoggingService.info(
+        'Queued push notification for user $recipientId via backend processor.',
         category: _logCategory,
       );
-      return;
-    }
-
-    // Store notification data for auditing/inbox purposes.
-    // A backend process (e.g. Cloud Function) should watch this collection and
-    // deliver the actual push via the server-side FCM Admin SDK.
-    await FirebaseFirestore.instance.collection('notifications').add({
-      'recipientId': recipientId,
-      'senderId': FirebaseAuth.instance.currentUser?.uid,
-      'senderName': senderName,
-      'message': message,
-      'chatId': chatId,
-      'timestamp': FieldValue.serverTimestamp(),
-      'read': false,
-      'fcmToken': fcmToken,
     });
-    LoggingService.info(
-      'Queued push notification for user $recipientId via backend processor.',
-      category: _logCategory,
-    );
   }
 }
 

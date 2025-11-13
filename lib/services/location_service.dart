@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'logging_service.dart';
+import 'monitoring_service.dart';
 
 class LocationService {
   static const String _logCategory = 'LocationService';
@@ -17,7 +18,7 @@ class LocationService {
   
   // Configuration - set to false to disable API calls temporarily
   static bool _enableApiSearch = false;
-  static http.Client _httpClient = http.Client();
+  static http.Client _httpClient = NetworkTrackedClient();
   
   static String _lastQuery = '';
   static List<Map<String, dynamic>> _lastResults = [];
@@ -45,182 +46,186 @@ class LocationService {
   @visibleForTesting
   static void resetTestOverrides() {
     _enableApiSearch = false;
-    _httpClient = http.Client();
+    _httpClient = NetworkTrackedClient();
     _lastQuery = '';
     _lastResults = [];
   }
 
   /// Search for places using Nominatim (OpenStreetMap) API with caching and debouncing
   /// Returns a list of location results with coordinates and display names
-  static Future<List<Map<String, dynamic>>> searchPlaces(String query) async {
-    if (query.trim().isEmpty) return [];
-    
-    final cleanQuery = query.trim().toLowerCase();
-    
-    // Return cached results if same query
-    if (cleanQuery == _lastQuery && _lastResults.isNotEmpty) {
-      return _lastResults;
-    }
-    
-    // Check cache first
-    final cachedResults = await _getCachedResults(cleanQuery);
-    if (cachedResults.isNotEmpty) {
-      _lastQuery = cleanQuery;
-      _lastResults = cachedResults;
-      return cachedResults;
-    }
-    
-    // Skip API call for very short queries to reduce load or if API is disabled
-    if (cleanQuery.length < 3 || !_enableApiSearch) {
-      return [];
-    }
-    
-    try {
-      final encodedQuery = Uri.encodeComponent('$cleanQuery Thailand');
-      final url = '$_nominatimBaseUrl?q=$encodedQuery&format=json&limit=10&countrycodes=th&addressdetails=1&accept-language=th';
+  static Future<List<Map<String, dynamic>>> searchPlaces(String query) {
+    return ServiceJobScope.run('LocationService.searchPlaces', () async {
+      if (query.trim().isEmpty) return [];
       
-      final response = await _httpClient
-          .get(
-            Uri.parse(url),
-            headers: {
-              'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)',
-              'Accept': 'application/json',
-              'Accept-Language': 'th',
-            },
-          )
-          .timeout(_timeout);
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        
-        // Filter and format results
-        final results = data
-            .where((item) => item['lat'] != null && item['lon'] != null)
-            .take(10) // Limit results
-            .map<Map<String, dynamic>>((item) {
-          // Clean up display name for better readability
-          String displayName = item['display_name'] ?? item['name'] ?? 'Unknown Place';
-          
-          // Shorten very long display names
-          if (displayName.length > 80) {
-            final parts = displayName.split(', ');
-            if (parts.length > 3) {
-              displayName = '${parts[0]}, ${parts[1]}, ${parts[2]}...';
-            }
-          }
-          
-          return {
-            'type': 'place',
-            'title': displayName,
-            'latitude': double.tryParse(item['lat'].toString()) ?? 0.0,
-            'longitude': double.tryParse(item['lon'].toString()) ?? 0.0,
-            'source': 'api',
-            'category': _categorizePlace(item),
-          };
-        }).toList();
-        
-        // Cache successful results
-        await _cacheResults(cleanQuery, results);
-        
+      final cleanQuery = query.trim().toLowerCase();
+      
+      // Return cached results if same query
+      if (cleanQuery == _lastQuery && _lastResults.isNotEmpty) {
+        return _lastResults;
+      }
+      
+      // Check cache first
+      final cachedResults = await _getCachedResults(cleanQuery);
+      if (cachedResults.isNotEmpty) {
         _lastQuery = cleanQuery;
-        _lastResults = results;
+        _lastResults = cachedResults;
+        return cachedResults;
+      }
+      
+      // Skip API call for very short queries to reduce load or if API is disabled
+      if (cleanQuery.length < 3 || !_enableApiSearch) {
+        return [];
+      }
+      
+      try {
+        final encodedQuery = Uri.encodeComponent('$cleanQuery Thailand');
+        final url = '$_nominatimBaseUrl?q=$encodedQuery&format=json&limit=10&countrycodes=th&addressdetails=1&accept-language=th';
         
-        return results;
-      } else {
+        final response = await _httpClient
+            .get(
+              Uri.parse(url),
+              headers: {
+                'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)',
+                'Accept': 'application/json',
+                'Accept-Language': 'th',
+              },
+            )
+            .timeout(_timeout);
+
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+          
+          // Filter and format results
+          final results = data
+              .where((item) => item['lat'] != null && item['lon'] != null)
+              .take(10) // Limit results
+              .map<Map<String, dynamic>>((item) {
+            // Clean up display name for better readability
+            String displayName = item['display_name'] ?? item['name'] ?? 'Unknown Place';
+            
+            // Shorten very long display names
+            if (displayName.length > 80) {
+              final parts = displayName.split(', ');
+              if (parts.length > 3) {
+                displayName = '${parts[0]}, ${parts[1]}, ${parts[2]}...';
+              }
+            }
+            
+            return {
+              'type': 'place',
+              'title': displayName,
+              'latitude': double.tryParse(item['lat'].toString()) ?? 0.0,
+              'longitude': double.tryParse(item['lon'].toString()) ?? 0.0,
+              'source': 'api',
+              'category': _categorizePlace(item),
+            };
+          }).toList();
+          
+          // Cache successful results
+          await _cacheResults(cleanQuery, results);
+          
+          _lastQuery = cleanQuery;
+          _lastResults = results;
+          
+          return results;
+        } else {
+          LoggingService.warning(
+            'Nominatim API request failed with status: ${response.statusCode}',
+            category: _logCategory,
+          );
+        }
+      } on TimeoutException {
         LoggingService.warning(
-          'Nominatim API request failed with status: ${response.statusCode}',
+          'Nominatim API timeout - using cached/static results only',
+          category: _logCategory,
+        );
+      } catch (e, stack) {
+        LoggingService.error(
+          'Error searching places from Nominatim API',
+          error: e,
+          stackTrace: stack,
           category: _logCategory,
         );
       }
-    } on TimeoutException {
-      LoggingService.warning(
-        'Nominatim API timeout - using cached/static results only',
-        category: _logCategory,
-      );
-    } catch (e, stack) {
-      LoggingService.error(
-        'Error searching places from Nominatim API',
-        error: e,
-        stackTrace: stack,
-        category: _logCategory,
-      );
-    }
-    
-    return [];
+      
+      return [];
+    });
   }
 
   /// Reverse geocode coordinates into a human-readable Thai address
-  static Future<Map<String, dynamic>?> reverseGeocode(double latitude, double longitude) async {
-    final key = '${latitude.toStringAsFixed(5)},${longitude.toStringAsFixed(5)}';
-    
-    // In-memory cache to avoid repeated lookups in same session
-    if (_memoryReverseCache.containsKey(key)) {
-      return _memoryReverseCache[key];
-    }
-    
-    final cachedResult = await _getCachedReverseResult(key);
-    if (cachedResult != null) {
-      _memoryReverseCache[key] = cachedResult;
-      return cachedResult;
-    }
-    
-    final url = '$_nominatimReverseUrl?format=json&lat=$latitude&lon=$longitude&zoom=18&addressdetails=1&accept-language=th';
-    
-    try {
-      final response = await _httpClient
-          .get(
-            Uri.parse(url),
-            headers: {
-              'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)',
-              'Accept': 'application/json',
-              'Accept-Language': 'th',
-            },
-          )
-          .timeout(_timeout);
+  static Future<Map<String, dynamic>?> reverseGeocode(double latitude, double longitude) {
+    return ServiceJobScope.run('LocationService.reverseGeocode', () async {
+      final key = '${latitude.toStringAsFixed(5)},${longitude.toStringAsFixed(5)}';
+      
+      // In-memory cache to avoid repeated lookups in same session
+      if (_memoryReverseCache.containsKey(key)) {
+        return _memoryReverseCache[key];
+      }
+      
+      final cachedResult = await _getCachedReverseResult(key);
+      if (cachedResult != null) {
+        _memoryReverseCache[key] = cachedResult;
+        return cachedResult;
+      }
+      
+      final url = '$_nominatimReverseUrl?format=json&lat=$latitude&lon=$longitude&zoom=18&addressdetails=1&accept-language=th';
+      
+      try {
+        final response = await _httpClient
+            .get(
+              Uri.parse(url),
+              headers: {
+                'User-Agent': 'PaisabaiApp/1.0 (Flutter Mobile App)',
+                'Accept': 'application/json',
+                'Accept-Language': 'th',
+              },
+            )
+            .timeout(_timeout);
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final Map<String, dynamic>? address = data['address'] != null
-            ? Map<String, dynamic>.from(data['address'])
-            : null;
-        final formattedAddress = data['display_name']?.toString();
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> data = json.decode(response.body);
+          final Map<String, dynamic>? address = data['address'] != null
+              ? Map<String, dynamic>.from(data['address'])
+              : null;
+          final formattedAddress = data['display_name']?.toString();
 
-        final result = {
-          'formattedAddress': formattedAddress,
-          'houseNumber': address?['house_number'],
-          'road': address?['road'] ?? address?['street'] ?? address?['residential'],
-          'subdistrict': address?['suburb'] ?? address?['quarter'] ?? address?['village'] ?? address?['hamlet'],
-          'district': address?['city_district'] ?? address?['district'] ?? address?['county'] ?? address?['city'],
-          'province': address?['state'] ?? address?['region'],
-          'postcode': address?['postcode'],
-          'country': address?['country'] ?? 'Thailand',
-          'raw': address,
-        };
+          final result = {
+            'formattedAddress': formattedAddress,
+            'houseNumber': address?['house_number'],
+            'road': address?['road'] ?? address?['street'] ?? address?['residential'],
+            'subdistrict': address?['suburb'] ?? address?['quarter'] ?? address?['village'] ?? address?['hamlet'],
+            'district': address?['city_district'] ?? address?['district'] ?? address?['county'] ?? address?['city'],
+            'province': address?['state'] ?? address?['region'],
+            'postcode': address?['postcode'],
+            'country': address?['country'] ?? 'Thailand',
+            'raw': address,
+          };
 
-        _memoryReverseCache[key] = result;
-        await _cacheReverseResult(key, result);
-        return result;
-      } else {
+          _memoryReverseCache[key] = result;
+          await _cacheReverseResult(key, result);
+          return result;
+        } else {
+          LoggingService.warning(
+            'Nominatim reverse API failed with status: ${response.statusCode}',
+            category: _logCategory,
+          );
+        }
+      } on TimeoutException {
         LoggingService.warning(
-          'Nominatim reverse API failed with status: ${response.statusCode}',
+          'Nominatim reverse API timeout - returning null',
+          category: _logCategory,
+        );
+      } catch (e, stack) {
+        LoggingService.error(
+          'Error performing reverse geocode',
+          error: e,
+          stackTrace: stack,
           category: _logCategory,
         );
       }
-    } on TimeoutException {
-      LoggingService.warning(
-        'Nominatim reverse API timeout - returning null',
-        category: _logCategory,
-      );
-    } catch (e, stack) {
-      LoggingService.error(
-        'Error performing reverse geocode',
-        error: e,
-        stackTrace: stack,
-        category: _logCategory,
-      );
-    }
-
-    return null;
+      
+      return null;
+    });
   }
 
   /// Categorize places based on OpenStreetMap tags

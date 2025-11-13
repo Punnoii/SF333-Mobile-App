@@ -1,15 +1,16 @@
-import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import '../config/app_config.dart';
 import 'logging_service.dart';
+import 'monitoring_service.dart';
 
 class CloudinaryService {
   static const String _logCategory = 'CloudinaryService';
   static String get _cloudName => AppConfig.cloudinaryCloudName;
   static String get _uploadPreset => AppConfig.cloudinaryUploadPreset;
-  static http.Client _httpClient = http.Client();
+  static http.Client _httpClient = NetworkTrackedClient();
 
   static String get _baseUploadUrl =>
       _cloudName.isEmpty ? '' : 'https://api.cloudinary.com/v1_1/$_cloudName/image/upload';
@@ -30,64 +31,66 @@ class CloudinaryService {
 
   @visibleForTesting
   static void resetDependencies() {
-    _httpClient = http.Client();
+    _httpClient = NetworkTrackedClient();
   }
 
   static Future<String?> uploadProfileImage(File imageFile, String userId) async {
-    if (_cloudName.isEmpty || _uploadPreset.isEmpty) {
-      LoggingService.warning(
-        'Missing Cloudinary configuration. Check CLOUDINARY_* entries in .env',
-        category: _logCategory,
-      );
-      return null;
-    }
-
-    try {
-      final url = Uri.parse(_baseUploadUrl);
-      
-      final request = http.MultipartRequest('POST', url);
-      request.fields['upload_preset'] = _uploadPreset;
-      
-      final file = await http.MultipartFile.fromPath('file', imageFile.path);
-      request.files.add(file);
-      
-      // Add timeout to prevent hanging uploads
-      final response = await _httpClient.send(request).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw Exception('Upload request timed out');
-        },
-      );
-      
-      if (response.statusCode == 200) {
-        final responseData = await response.stream.bytesToString().timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            throw Exception('Response reading timed out');
-          },
-        );
-        final jsonData = json.decode(responseData);
-        return jsonData['secure_url'];
-      } else {
-        final responseData = await response.stream.bytesToString().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => 'Response timeout',
-        );
+    return ServiceJobScope.run('CloudinaryService.uploadProfileImage', () async {
+      if (_cloudName.isEmpty || _uploadPreset.isEmpty) {
         LoggingService.warning(
-          'Cloudinary upload failed (${response.statusCode}): $responseData, fields: ${request.fields}',
+          'Missing Cloudinary configuration. Check CLOUDINARY_* entries in .env',
           category: _logCategory,
         );
         return null;
       }
-    } catch (e, stack) {
-      LoggingService.error(
-        'Cloudinary upload error',
-        error: e,
-        stackTrace: stack,
-        category: _logCategory,
-      );
-      return null;
-    }
+
+      try {
+        final url = Uri.parse(_baseUploadUrl);
+        
+        final request = http.MultipartRequest('POST', url);
+        request.fields['upload_preset'] = _uploadPreset;
+        
+        final file = await http.MultipartFile.fromPath('file', imageFile.path);
+        request.files.add(file);
+        
+        // Add timeout to prevent hanging uploads
+        final response = await _httpClient.send(request).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            throw Exception('Upload request timed out');
+          },
+        );
+        
+        if (response.statusCode == 200) {
+          final responseData = await response.stream.bytesToString().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw Exception('Response reading timed out');
+            },
+          );
+          final jsonData = json.decode(responseData);
+          return jsonData['secure_url'];
+        } else {
+          final responseData = await response.stream.bytesToString().timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => 'Response timeout',
+          );
+          LoggingService.warning(
+            'Cloudinary upload failed (${response.statusCode}): $responseData, fields: ${request.fields}',
+            category: _logCategory,
+          );
+          return null;
+        }
+      } catch (e, stack) {
+        LoggingService.error(
+          'Cloudinary upload error',
+          error: e,
+          stackTrace: stack,
+          category: _logCategory,
+        );
+        return null;
+      }
+    });
   }
 
   static String getProfileImageUrl(String userId, {int width = 200, int height = 200}) {

@@ -17,4 +17,18 @@ class AppConfig {
   static String get cloudinaryUploadPreset => dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
   static String get cloudinaryBaseImagePath =>
       dotenv.env['CLOUDINARY_BASE_IMAGE_PATH'] ?? 'paisabai';
+  
+  static bool get enablePerformanceOverlay =>
+      (dotenv.env['SHOW_PERFORMANCE_OVERLAY'] ?? 'false').toLowerCase() == 'true';
+  
+  static bool get logSlowFrames =>
+      (dotenv.env['LOG_SLOW_FRAMES'] ?? 'false').toLowerCase() == 'true';
+  
+  static Duration get slowFrameThreshold {
+    final raw = int.tryParse(dotenv.env['SLOW_FRAME_THRESHOLD_MS'] ?? '');
+    if (raw == null || raw <= 0) {
+      return const Duration(milliseconds: 16);
+    }
+    return Duration(milliseconds: raw);
+  }
 }
