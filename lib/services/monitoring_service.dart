@@ -85,8 +85,10 @@ class FrameMonitorService {
     Duration slowFrameThreshold = const Duration(milliseconds: 16),
     bool logSlowFrames = false,
   }) {
-    if (_initialized || !logSlowFrames) {
-      _initialized = true;
+    if (!logSlowFrames) {
+      return;
+    }
+    if (_initialized) {
       return;
     }
     _initialized = true;
@@ -150,8 +152,12 @@ class SessionNetworkTracker {
     } else {
       totals.failed = min(totals.failed + 1, 1 << 30);
     }
-    totals.bytesIn += bytesIn;
-    totals.bytesOut += bytesOut;
+    if (totals.bytesIn == 0 && bytesIn > 0) {
+      totals.bytesIn = bytesIn;
+    }
+    if (totals.bytesOut == 0 && bytesOut > 0) {
+      totals.bytesOut = bytesOut;
+    }
 
     LoggingService.info(
       'Job $jobName completed in ${elapsed.inMilliseconds}ms | '
