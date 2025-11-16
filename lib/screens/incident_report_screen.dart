@@ -7,9 +7,9 @@ import '../services/theme_service.dart';
 import '../viewmodels/incident_report_view_model.dart';
 import 'incident_report/incident_report_styles.dart';
 import 'incident_report/widgets/incident_card.dart';
-import 'incident_report/widgets/incident_detail_sheet.dart';
 import 'incident_report/widgets/incident_empty_state.dart';
 import 'incident_report/widgets/incident_filters_bar.dart';
+import 'incident_detail_screen.dart';
 
 class IncidentReportScreen extends StatelessWidget {
   const IncidentReportScreen({super.key});
@@ -163,7 +163,7 @@ class _IncidentReportViewState extends State<_IncidentReportView> {
                                 reportedText: reportedText,
                                 isBookmarked: viewModel.isBookmarked(incident),
                                 onToggleBookmark: () => viewModel.toggleBookmark(incident),
-                                onTap: () => _showIncidentDetails(context, viewModel, incident, isDark),
+                                onTap: () => _openIncidentDetail(context, incident),
                               );
                             },
                           ),
@@ -179,29 +179,43 @@ class _IncidentReportViewState extends State<_IncidentReportView> {
     return 'ละติจูด ${incident.latitude!.toStringAsFixed(4)}, ลองจิจูด ${incident.longitude!.toStringAsFixed(4)}';
   }
 
-  void _showIncidentDetails(
-    BuildContext context,
-    IncidentReportViewModel viewModel,
-    Incident incident,
-    bool isDark,
-  ) {
-    final locationText = viewModel.getDisplayAddress(incident) ?? _formatCoordinates(incident);
-    final timeAgo = viewModel.formatTimeAgo(incident.reportedAt?.toDate());
+  Future<void> _openIncidentDetail(BuildContext context, Incident incident) {
+    final incidentMap = {
+      'title': incident.title,
+      'description': incident.description,
+      'status': incident.status,
+      'category': incident.category,
+      'reporterId': incident.reporterId,
+      'reporterName': incident.reporterName,
+      'reporterEmail': incident.reporterEmail,
+      'bookmarkedBy': incident.bookmarkedBy,
+      'affectedDisabilityTypes': incident.affectedDisabilityTypes,
+      'latitude': incident.latitude,
+      'longitude': incident.longitude,
+      'reportedAt': incident.reportedAt,
+      'timestamp': incident.reportedAt,
+      'formattedAddress': incident.formattedAddress,
+      'address': incident.address,
+    };
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => IncidentDetailSheet(
-        incident: incident,
-        isDark: isDark,
-        statusLabel: viewModel.getStatusLabel(incident.status),
-        categoryLabel: viewModel.getCategoryLabel(incident.category),
-        disabilityTypes: viewModel.disabilityConfigs(incident),
-        locationText: locationText,
-        timeAgo: timeAgo,
-        isBookmarked: viewModel.isBookmarked(incident),
-        onToggleBookmark: () => viewModel.toggleBookmark(incident),
+    return Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        opaque: true,
+        barrierColor: Colors.transparent,
+        pageBuilder: (_, __, ___) => IncidentDetailScreen(
+          incident: incidentMap,
+          incidentId: incident.id,
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1, 0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+          final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
       ),
     );
   }

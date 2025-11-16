@@ -43,6 +43,30 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
     super.dispose();
   }
 
+  Future<void> _openIncidentDetail(BuildContext context, Map<String, dynamic> incident, String incidentId) {
+    // Always push as a full-screen page with a slide-in transition (same experience as other entry points)
+    return Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        opaque: true,
+        barrierColor: Colors.transparent,
+        pageBuilder: (_, __, ___) => IncidentDetailScreen(
+          incident: incident,
+          incidentId: incidentId,
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1, 0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+          final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _getCurrentLocation() async {
     setState(() {
       _isLoadingLocation = true;
@@ -535,12 +559,18 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                         normalizedData['reporterEmail'] = 'ไม่ทราบ';
                       }
                       
-                      return _IncidentCard(
-                        incidentId: incidentId,
-                        data: normalizedData,
-                        currentPosition: _currentPosition,
-                        onStatusUpdate: _updateIncidentStatus,
-                        onShowFixerDialog: _showFixerDialog,
+                      return GestureDetector(
+                        onTap: () {
+                          _openIncidentDetail(context, normalizedData, incidentId);
+                        },
+                        child: _IncidentCard(
+                          incidentId: incidentId,
+                          data: normalizedData,
+                          currentPosition: _currentPosition,
+                          onStatusUpdate: _updateIncidentStatus,
+                          onShowFixerDialog: _showFixerDialog,
+                          onOpenDetail: _openIncidentDetail,
+                        ),
                       );
                     },
                   );
@@ -560,6 +590,7 @@ class _IncidentCard extends StatelessWidget {
   final Position? currentPosition;
   final Function(String, String, {String? fixerImage, String? fixerDetails}) onStatusUpdate;
   final Function(String) onShowFixerDialog;
+  final Future<void> Function(BuildContext, Map<String, dynamic>, String) onOpenDetail;
 
   const _IncidentCard({
     required this.incidentId,
@@ -567,6 +598,7 @@ class _IncidentCard extends StatelessWidget {
     this.currentPosition,
     required this.onStatusUpdate,
     required this.onShowFixerDialog,
+    required this.onOpenDetail,
   });
 
   double? _getDistance() {
@@ -864,15 +896,7 @@ class _IncidentCard extends StatelessWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => IncidentDetailScreen(
-                                incident: data,
-                                incidentId: incidentId,
-                              ),
-                            ),
-                          );
+                          onOpenDetail(context, data, incidentId);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.tealAccent,

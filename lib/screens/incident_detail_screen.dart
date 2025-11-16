@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../constants/disability_types.dart';
 import '../services/theme_service.dart';
+import 'comment_screen.dart';
 
 class IncidentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> incident;
@@ -208,6 +209,21 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
         title: Text(widget.incident['title'] ?? 'รายละเอียดเหตุ'),
         backgroundColor: isDark ? Colors.black : Colors.white,
         actions: [
+          IconButton(
+            tooltip: 'ดูความคิดเห็น',
+            icon: Icon(
+              Icons.chat_bubble_outline,
+              color: isDark ? Colors.grey[300] : Colors.grey[700],
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CommentScreen(incidentId: widget.incidentId),
+                ),
+              );
+            },
+          ),
           if (canBookmark)
             IconButton(
               icon: Icon(

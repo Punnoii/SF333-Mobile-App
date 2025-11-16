@@ -6,8 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'user_profile_screen.dart';
 
 class CommentScreen extends StatefulWidget {
-  final String postId;
-  const CommentScreen({super.key, required this.postId});
+  final String incidentId;
+  const CommentScreen({super.key, required this.incidentId});
 
   @override
   State<CommentScreen> createState() => _CommentScreenState();
@@ -31,8 +31,8 @@ class _CommentScreenState extends State<CommentScreen> {
 
     try {
       await _firestore
-          .collection('posts')
-          .doc(widget.postId)
+          .collection('incidents')
+          .doc(widget.incidentId)
           .collection('comments')
           .add({
         'content': _commentController.text.trim(),
@@ -42,7 +42,7 @@ class _CommentScreenState extends State<CommentScreen> {
       });
 
       // Update comment count
-      await _firestore.collection('posts').doc(widget.postId).update({
+      await _firestore.collection('incidents').doc(widget.incidentId).update({
         'comments': FieldValue.increment(1),
       });
 
@@ -60,7 +60,7 @@ class _CommentScreenState extends State<CommentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ความคิดเห็น'),
+        title: const Text('ความคิดเห็นของเหตุ'),
         backgroundColor: Colors.black,
       ),
       body: Column(
@@ -68,8 +68,8 @@ class _CommentScreenState extends State<CommentScreen> {
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _firestore
-                  .collection('posts')
-                  .doc(widget.postId)
+                  .collection('incidents')
+                  .doc(widget.incidentId)
                   .collection('comments')
                   .orderBy('timestamp', descending: false)
                   .snapshots(),

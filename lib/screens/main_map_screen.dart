@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
@@ -25,6 +26,259 @@ class MainMapScreen extends StatefulWidget {
   State<MainMapScreen> createState() => _MainMapScreenState();
 }
 
+class _ClusterIncidentListScreen extends StatelessWidget {
+  const _ClusterIncidentListScreen({
+    required this.items,
+    required this.categoryColor,
+    required this.openDetail,
+  });
+
+  final List<QueryDocumentSnapshot> items;
+  final Color Function(String?) categoryColor;
+  final void Function(Map<String, dynamic>, String) openDetail;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('หมุดในบริเวณนี้ (${items.length})'),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final doc = items[index];
+          final data = doc.data() as Map<String, dynamic>;
+          final title = data['title']?.toString() ?? 'ไม่มีชื่อเรื่อง';
+          final status = data['status']?.toString() ?? 'pending';
+          final category = data['category']?.toString() ?? 'Other';
+          final addressText = _getReadableAddress(data) ?? _getCoordinateText(data);
+          final timeText = _formatTimestamp(data);
+
+          return GestureDetector(
+            onTap: () => openDetail(data, doc.id),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Card(
+                elevation: 8,
+                shadowColor: Colors.tealAccent.withValues(alpha: 0.15),
+                color: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark
+                          ? [
+                              const Color(0xFF2B2B2B),
+                              Colors.grey[800]!.withValues(alpha: 0.9),
+                            ]
+                          : [
+                              Colors.white,
+                              Colors.grey[50]!,
+                            ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _getStatusColor(status).withValues(alpha: 0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(status),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _getStatusText(status),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              height: 28,
+                              width: 28,
+                              decoration: BoxDecoration(
+                                color: categoryColor(category).withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: categoryColor(category),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.push_pin,
+                                size: 16,
+                                color: categoryColor(category),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        if ((data['description']?.toString() ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            data['description'].toString(),
+                            style: TextStyle(
+                              color: isDark ? Colors.grey[300] : Colors.grey[700],
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        if (addressText != null) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  addressText,
+                                  style: TextStyle(
+                                    color: isDark ? Colors.grey[300] : Colors.grey[700],
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (timeText != null) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.access_time,
+                                size: 14,
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                timeText,
+                                style: TextStyle(
+                                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'pending':
+        return 'รอแจ้ง';
+      case 'in_progress':
+        return 'กำลังดำเนินการ';
+      case 'completed':
+        return 'เสร็จสิ้น';
+      case 'closed':
+        return 'ปิดเหตุ';
+      default:
+        return 'ไม่ทราบสถานะ';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'pending':
+        return Colors.orange;
+      case 'in_progress':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      case 'closed':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String? _getReadableAddress(Map<String, dynamic> data) {
+    final formatted = data['formattedAddress'];
+    if (formatted is String && formatted.trim().isNotEmpty) {
+      return formatted;
+    }
+    final address = data['address'];
+    if (address is Map<String, dynamic>) {
+      final parts = [
+        address['houseNumber'],
+        address['road'],
+        address['subdistrict'],
+        address['district'],
+        address['province'],
+        address['postcode'],
+      ]
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+      if (parts.isNotEmpty) {
+        return parts.join(' ');
+      }
+    }
+    return null;
+  }
+
+  String? _getCoordinateText(Map<String, dynamic> data) {
+    final lat = data['latitude'];
+    final lng = data['longitude'];
+    if (lat is num && lng is num) {
+      return 'ละติจูด ${lat.toStringAsFixed(4)}, ลองจิจูด ${lng.toStringAsFixed(4)}';
+    }
+    return null;
+  }
+
+  String? _formatTimestamp(Map<String, dynamic> data) {
+    final timestamp = data['timestamp'] as Timestamp? ?? data['reportedAt'] as Timestamp?;
+    if (timestamp == null) return null;
+    return DateFormat('dd/MM/yy HH:mm').format(timestamp.toDate());
+  }
+}
+
 class _MainMapScreenState extends State<MainMapScreen> {
   static const String _logCategory = 'MainMapScreen';
   int currentIndex = 1; // Start with Home (map) tab
@@ -34,9 +288,12 @@ class _MainMapScreenState extends State<MainMapScreen> {
   final double _minZoom = 3;
   final double _maxZoom = 18;
   double _currentZoom = 12;
+  static const int _maxIncidentsToRender = 300;
   LatLng _currentCenter = const LatLng(13.7563, 100.5018); // Bangkok default
   LatLng? _selectedLocation;
   bool _showPopup = false;
+  bool _ignoreNextMapTap = false;
+  bool _navigatingFromMap = false;
   int _unreadChatCount = 0;
   Position? _currentPosition;
   bool _isLoadingLocation = false;
@@ -1095,6 +1352,13 @@ class _MainMapScreenState extends State<MainMapScreen> {
   }
 
   void _handleMapTap(LatLng point) {
+    if (_ignoreNextMapTap || _navigatingFromMap) {
+      // Skip map tap triggered by marker taps to avoid showing popup
+      _ignoreNextMapTap = false;
+      _navigatingFromMap = false;
+      return;
+    }
+    _hidePopup();
     // Single tap - show popup with pin
     setState(() {
       _selectedLocation = point;
@@ -1106,6 +1370,13 @@ class _MainMapScreenState extends State<MainMapScreen> {
   // Search places from external API using LocationService
   Future<List<Map<String, dynamic>>> _searchPlacesFromAPI(String query) async {
     return await LocationService.searchPlaces(query);
+  }
+
+  void _onMapEvent(MapEvent event) {
+    setState(() {
+      _currentZoom = event.camera.zoom;
+      _currentCenter = event.camera.center;
+    });
   }
 
   // Search incidents
@@ -1195,6 +1466,155 @@ class _MainMapScreenState extends State<MainMapScreen> {
         });
       }
     });
+  }
+
+  double _clusterGridSize(double zoom) {
+    if (zoom >= 16) return 0.001; // ~100m grid
+    if (zoom >= 14) return 0.005;
+    if (zoom >= 12) return 0.01;
+    if (zoom >= 10) return 0.05;
+    return 0.1; // coarse grid when zoomed far out
+  }
+
+  void _hidePopup() {
+    if (_showPopup || _selectedLocation != null) {
+      setState(() {
+        _showPopup = false;
+        _selectedLocation = null;
+      });
+    }
+  }
+
+  void _openIncidentDetail(Map<String, dynamic> data, String incidentId) {
+    _hidePopup();
+    _ignoreNextMapTap = true;
+    _navigatingFromMap = true;
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (_) => IncidentDetailScreen(
+          incident: data,
+          incidentId: incidentId,
+        ),
+      ),
+    );
+  }
+
+  void _openClusterList(List<QueryDocumentSnapshot> items) {
+    _hidePopup();
+    _ignoreNextMapTap = true;
+    _navigatingFromMap = true;
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (_) => _ClusterIncidentListScreen(
+          items: items.toList(),
+          categoryColor: _getCategoryColor,
+          openDetail: _openIncidentDetail,
+        ),
+      ),
+    );
+  }
+
+  List<Marker> _buildClusteredMarkers(Iterable<QueryDocumentSnapshot> incidents) {
+    final double gridSize = _clusterGridSize(_currentZoom);
+    final Map<String, List<QueryDocumentSnapshot>> buckets = {};
+
+    for (final doc in incidents) {
+      final data = doc.data() as Map<String, dynamic>;
+      final lat = data['latitude'];
+      final lng = data['longitude'];
+      if (lat is! num || lng is! num) continue;
+
+      final key = '${(lat / gridSize).floor()}_${(lng / gridSize).floor()}';
+      buckets.putIfAbsent(key, () => []).add(doc);
+    }
+
+    return buckets.values.map((bucket) {
+      final List<QueryDocumentSnapshot> items = bucket;
+      double avgLat = 0;
+      double avgLng = 0;
+      for (final doc in items) {
+        final data = doc.data() as Map<String, dynamic>;
+        avgLat += (data['latitude'] as num).toDouble();
+        avgLng += (data['longitude'] as num).toDouble();
+      }
+      avgLat /= items.length;
+      avgLng /= items.length;
+      final point = LatLng(avgLat, avgLng);
+
+      if (items.length == 1) {
+        final data = items.first.data() as Map<String, dynamic>;
+        return Marker(
+          point: point,
+          child: GestureDetector(
+            onTap: () {
+              _openIncidentDetail(data, items.first.id);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _getCategoryColor(data['category']),
+                    _getCategoryColor(data['category']).withValues(alpha: 0.8),
+                  ],
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: _getCategoryColor(data['category']).withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.warning,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
+        );
+      }
+
+      return Marker(
+        point: point,
+        child: GestureDetector(
+          onTap: () {
+            _openClusterList(items);
+          },
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.blue.shade700,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                items.length.toString(),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ),
+      );
+    }).toList();
   }
 
   @override
@@ -1823,15 +2243,38 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 flags: InteractiveFlag.all & ~InteractiveFlag.doubleTapZoom,
               ),
               onTap: (tapPosition, point) => _handleMapTap(point),
+              onMapEvent: _onMapEvent,
             ),
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.paisabai_app',
               ),
+              // Current location marker (drawn under incident markers)
+              if (_currentPosition != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.8),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               // Show all incidents as markers
               StreamBuilder<QuerySnapshot>(
-                stream: _firestore.collection('incidents').snapshots(),
+                stream: _firestore
+                    .collection('incidents')
+                    .orderBy('timestamp', descending: true)
+                    .limit(_maxIncidentsToRender)
+                    .snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) return const SizedBox.shrink();
                   
@@ -1858,80 +2301,10 @@ class _MainMapScreenState extends State<MainMapScreen> {
                   }
 
                   return MarkerLayer(
-                    markers: incidents.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final lat = data['latitude'] as double;
-                      final lng = data['longitude'] as double;
-                      
-                      return Marker(
-                        point: LatLng(lat, lng),
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => IncidentDetailScreen(
-                                  incident: data,
-                                  incidentId: doc.id,
-                                ),
-                              ),
-                            );
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  _getCategoryColor(data['category']),
-                                  _getCategoryColor(data['category']).withValues(alpha: 0.8),
-                                ],
-                              ),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _getCategoryColor(data['category']).withValues(alpha: 0.4),
-                                  blurRadius: 8,
-                                  spreadRadius: 2,
-                                ),
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.warning,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                    markers: _buildClusteredMarkers(incidents),
                   );
                 },
               ),
-              // Current location marker
-              if (_currentPosition != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                      child: Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               // Selected location marker
               if (_selectedLocation != null)
                 MarkerLayer(
