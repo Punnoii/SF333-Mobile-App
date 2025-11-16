@@ -21,12 +21,14 @@ service cloud.firestore {
         'description',
         'category',
         'severity',
+        'affectedDisabilityTypes',
         'latitude',
         'longitude',
         'imageUrl',
         'reporterId',
         'reporterName',
         'reporterEmail',
+        'bookmarkedBy',
         'status',
         'timestamp',
         'createdAt',
@@ -54,6 +56,20 @@ service cloud.firestore {
       return status in ['pending', 'in_progress', 'resolved', 'completed', 'closed'];
     }
 
+    function allowedDisabilityTypes() {
+      return ['vision', 'hearing', 'mobility', 'cognitive', 'communication', 'other'];
+    }
+
+    function validDisabilityTypes(types) {
+      return types is list &&
+        types.size() > 0 &&
+        types.all(type => type is string && type in allowedDisabilityTypes());
+    }
+
+    function validBookmarks(list) {
+      return list is list && list.all(id => id is string);
+    }
+
     function baseIncidentSchema(data) {
       return validIncidentKeys(data) &&
         data.keys().hasAll(['title', 'description', 'category', 'severity', 'reporterId', 'reporterName', 'status']) &&
@@ -64,6 +80,8 @@ service cloud.firestore {
         data.reporterId is string && data.reporterId.size() > 0 &&
         data.reporterName is string && data.reporterName.size() > 0 &&
         data.status is string && validStatus(data.status) &&
+        (!('bookmarkedBy' in data) || validBookmarks(data.bookmarkedBy)) &&
+        (!('affectedDisabilityTypes' in data) || validDisabilityTypes(data.affectedDisabilityTypes)) &&
         (!('latitude' in data) || data.latitude is number || data.latitude == null) &&
         (!('longitude' in data) || data.longitude is number || data.longitude == null) &&
         (!('imageUrl' in data) || data.imageUrl is string || data.imageUrl == null) &&
@@ -80,13 +98,19 @@ service cloud.firestore {
       return ['title', 'description', 'imageUrl'];
     }
 
+    function isBookmarkOnlyUpdate(newData, existing) {
+      return newData.diff(existing).affectedKeys().hasOnly(['bookmarkedBy']) &&
+        validBookmarks(newData.bookmarkedBy);
+    }
+
     match /incidents/{incidentId} {
       allow read: if true;
 
       allow create: if isSignedIn() &&
         request.resource.data.reporterId == request.auth.uid &&
         request.resource.data.status == 'pending' &&
-        baseIncidentSchema(request.resource.data);
+        baseIncidentSchema(request.resource.data) &&
+        validDisabilityTypes(request.resource.data.affectedDisabilityTypes);
 
       allow update: if isSignedIn() && (
         (isModerator() && baseIncidentSchema(request.resource.data)) ||
@@ -95,7 +119,8 @@ service cloud.firestore {
           request.resource.data.status == resource.data.status &&
           request.resource.data.category == resource.data.category &&
           request.resource.data.severity == resource.data.severity &&
-          baseIncidentSchema(request.resource.data))
+          baseIncidentSchema(request.resource.data)) ||
+        (!isModerator() && isBookmarkOnlyUpdate(request.resource.data, resource.data))
       );
 
       allow delete: if isModerator();

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import '../constants/disability_types.dart';
 import '../services/theme_service.dart';
 import '../services/cloudinary_service.dart';
 import '../services/location_service.dart';
@@ -30,6 +31,7 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
   
   String _selectedCategory = 'Traffic';
   String _selectedSeverity = 'Medium';
+  final Set<String> _selectedDisabilityTypes = {};
   File? _selectedImage;
   bool _isSubmitting = false;
   
@@ -167,13 +169,16 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
         'description': _descriptionController.text.trim(),
         'category': _selectedCategory,
         'severity': _selectedSeverity,
+        'affectedDisabilityTypes': _selectedDisabilityTypes.toList(),
         'latitude': widget.latitude,
         'longitude': widget.longitude,
         'imageUrl': imageUrl,
         'reporterId': user.uid,
         'reporterName': user.displayName ?? 'ไม่ระบุตัวตน',
+        'reporterEmail': user.email,
         'status': 'pending',
         'timestamp': FieldValue.serverTimestamp(),
+        'reportedAt': FieldValue.serverTimestamp(),
         'createdAt': DateTime.now(),
       };
 
@@ -387,6 +392,77 @@ class _IncidentFormScreenState extends State<IncidentFormScreen> {
                         });
                       },
                     ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Disability types
+                Text(
+                  'ประเภทผู้พิการที่ได้รับผลกระทบ (เลือกได้หลายข้อ)',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FormField<List<String>>(
+                  validator: (_) {
+                    if (_selectedDisabilityTypes.isEmpty) {
+                      return 'กรุณาเลือกประเภทผู้พิการอย่างน้อย 1 ประเภท';
+                    }
+                    return null;
+                  },
+                  builder: (state) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: DisabilityTypes.options.map((option) {
+                          final isSelected = _selectedDisabilityTypes.contains(option.value);
+                          return FilterChip(
+                            label: Text(option.label),
+                            avatar: Icon(
+                              option.icon,
+                              size: 18,
+                              color: isSelected ? Colors.white : option.color,
+                            ),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _selectedDisabilityTypes.add(option.value);
+                                } else {
+                                  _selectedDisabilityTypes.remove(option.value);
+                                }
+                              });
+                              state.validate();
+                            },
+                            backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                            selectedColor: option.color,
+                            checkmarkColor: Colors.white,
+                            labelStyle: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark ? Colors.white : Colors.black87),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      if (state.hasError)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            state.errorText!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),

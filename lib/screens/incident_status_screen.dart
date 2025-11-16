@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'dart:math';
 import 'incident_detail_screen.dart';
+import '../constants/disability_types.dart';
 import '../services/cloudinary_service.dart';
 import '../services/theme_service.dart';
 
@@ -94,8 +95,12 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
         return 'รอแจ้ง';
       case 'in_progress':
         return 'กำลังดำเนินการ';
+      case 'resolved':
+        return 'แก้ไขแล้ว';
       case 'completed':
         return 'เสร็จสิ้น';
+      case 'closed':
+        return 'ปิดเหตุ';
       default:
         return 'ไม่ทราบสถานะ';
     }
@@ -275,9 +280,10 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                   isExpanded: true,
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('ทั้งหมด')),
-                    DropdownMenuItem(value: 'reported', child: Text('รอการตรวจสอบ')),
+                    DropdownMenuItem(value: 'pending', child: Text('รอการตรวจสอบ')),
                     DropdownMenuItem(value: 'in_progress', child: Text('กำลังดำเนินการ')),
-                    DropdownMenuItem(value: 'resolved', child: Text('แก้ไขแล้ว')),
+                    DropdownMenuItem(value: 'completed', child: Text('เสร็จสิ้น')),
+                    DropdownMenuItem(value: 'closed', child: Text('ปิดเหตุ')),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -648,6 +654,17 @@ class _IncidentCard extends StatelessWidget {
     }
   }
 
+  List<DisabilityTypeOption> _getDisabilityTypes() {
+    final types = data['affectedDisabilityTypes'];
+    if (types is Iterable) {
+      return types
+          .map((value) => DisabilityTypes.get(value?.toString()))
+          .whereType<DisabilityTypeOption>()
+          .toList();
+    }
+    return [];
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeService = Provider.of<ThemeService>(context);
@@ -655,6 +672,7 @@ class _IncidentCard extends StatelessWidget {
     final currentUser = FirebaseAuth.instance.currentUser;
     final status = data['status'] ?? 'pending';
     final distance = _getDistance();
+    final disabilityTypes = _getDisabilityTypes();
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -743,6 +761,30 @@ class _IncidentCard extends StatelessWidget {
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (disabilityTypes.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: disabilityTypes.map((type) {
+                      final bgColor = type.color.withValues(alpha: isDark ? 0.25 : 0.15);
+                      return Chip(
+                        label: Text(
+                          type.label,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        avatar: Icon(type.icon, size: 16, color: type.color),
+                        backgroundColor: bgColor,
+                        shape: StadiumBorder(
+                          side: BorderSide(color: type.color.withValues(alpha: 0.6)),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
                 if (_getReadableAddress() != null || _getCoordinateText() != null) ...[
                   const SizedBox(height: 8),
                   Row(

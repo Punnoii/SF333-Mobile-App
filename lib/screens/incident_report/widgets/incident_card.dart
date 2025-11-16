@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../constants/disability_types.dart';
 import '../../../models/incident.dart';
 import '../incident_report_styles.dart';
 
@@ -10,20 +11,26 @@ class IncidentCard extends StatelessWidget {
     required this.isDark,
     required this.statusLabel,
     required this.categoryLabel,
+    required this.disabilityTypes,
     required this.locationPreview,
     required this.distanceKm,
     required this.reportedText,
     required this.onTap,
+    this.onToggleBookmark,
+    this.isBookmarked = false,
   });
 
   final Incident incident;
   final bool isDark;
   final String statusLabel;
   final String categoryLabel;
+  final List<DisabilityTypeOption> disabilityTypes;
   final String? locationPreview;
   final double? distanceKm;
   final String reportedText;
   final VoidCallback onTap;
+  final VoidCallback? onToggleBookmark;
+  final bool isBookmarked;
 
   @override
   Widget build(BuildContext context) {
@@ -43,15 +50,35 @@ class IncidentCard extends StatelessWidget {
             size: 20,
           ),
         ),
-        title: Text(
-          incident.title.isNotEmpty ? incident.title : 'ยังไม่มีชื่อเหตุ',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                incident.title.isNotEmpty ? incident.title : 'ยังไม่มีชื่อเหตุ',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (onToggleBookmark != null)
+              IconButton(
+                iconSize: 22,
+                splashRadius: 20,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: Icon(
+                  isBookmarked ? Icons.star : Icons.star_border,
+                  color: isBookmarked
+                      ? Colors.amber
+                      : (isDark ? Colors.grey[500] : Colors.grey[600]),
+                ),
+                onPressed: onToggleBookmark,
+              ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,6 +121,37 @@ class IncidentCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (disabilityTypes.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: disabilityTypes.map((type) {
+                  final backgroundColor =
+                      type.color.withValues(alpha: isDark ? 0.25 : 0.15);
+                  return Chip(
+                    label: Text(
+                      type.label,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    avatar: Icon(
+                      type.icon,
+                      size: 16,
+                      color: type.color,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    backgroundColor: backgroundColor,
+                    shape: StadiumBorder(
+                      side: BorderSide(color: type.color.withValues(alpha: 0.6)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
             if (locationPreview != null) ...[
               const SizedBox(height: 6),
               Row(

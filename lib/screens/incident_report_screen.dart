@@ -150,15 +150,19 @@ class _IncidentReportViewState extends State<_IncidentReportView> {
                               final distance = viewModel.calculateDistanceKm(incident);
                               final reportedText =
                                   viewModel.formatTimeAgo(incident.reportedAt?.toDate());
+                              final disabilityTypes = viewModel.disabilityConfigs(incident);
 
                               return IncidentCard(
                                 incident: incident,
                                 isDark: isDark,
                                 statusLabel: viewModel.getStatusLabel(incident.status),
                                 categoryLabel: viewModel.getCategoryLabel(incident.category),
+                                disabilityTypes: disabilityTypes,
                                 locationPreview: locationPreview,
                                 distanceKm: distance,
                                 reportedText: reportedText,
+                                isBookmarked: viewModel.isBookmarked(incident),
+                                onToggleBookmark: () => viewModel.toggleBookmark(incident),
                                 onTap: () => _showIncidentDetails(context, viewModel, incident, isDark),
                               );
                             },
@@ -193,8 +197,11 @@ class _IncidentReportViewState extends State<_IncidentReportView> {
         isDark: isDark,
         statusLabel: viewModel.getStatusLabel(incident.status),
         categoryLabel: viewModel.getCategoryLabel(incident.category),
+        disabilityTypes: viewModel.disabilityConfigs(incident),
         locationText: locationText,
         timeAgo: timeAgo,
+        isBookmarked: viewModel.isBookmarked(incident),
+        onToggleBookmark: () => viewModel.toggleBookmark(incident),
       ),
     );
   }

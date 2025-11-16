@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../constants/disability_types.dart';
 import '../models/incident.dart';
 import '../repositories/incident_repository.dart';
 import '../services/location_service.dart';
@@ -13,6 +16,9 @@ class IncidentReportViewModel extends ChangeNotifier {
   }) : _repository = repository;
 
   final IncidentRepository _repository;
+  StreamSubscription<List<Incident>>? _incidentsSubscription;
+  bool _isDisposed = false;
+  String? _currentUserId;
 
   final List<String> _statusFilters = const [
     'All',
@@ -61,6 +67,7 @@ class IncidentReportViewModel extends ChangeNotifier {
   Position? get currentPosition => _currentPosition;
   bool get isLocating => _isLocating;
   String? get errorMessage => _errorMessage;
+  String? get currentUserId => _currentUserId;
 
   List<Incident> get filteredIncidents {
     Iterable<Incident> filtered = _incidents;
@@ -71,11 +78,15 @@ class IncidentReportViewModel extends ChangeNotifier {
     final query = _searchQuery.trim().toLowerCase();
     if (query.isNotEmpty) {
       filtered = filtered.where((incident) {
+        final disabilityLabels =
+            incident.affectedDisabilityTypes.map(DisabilityTypes.label).toList();
         final searchable = <String?>[
           incident.title,
           incident.description,
           incident.formattedAddress,
           ..._addressFields(incident.address),
+          ...incident.affectedDisabilityTypes,
+          ...disabilityLabels,
         ];
         return searchable
             .whereType<String>()
@@ -93,21 +104,45 @@ class IncidentReportViewModel extends ChangeNotifier {
     return filtered.toList();
   }
 
+  List<DisabilityTypeOption> disabilityConfigs(Incident incident) {
+    return incident.affectedDisabilityTypes
+        .map(DisabilityTypes.get)
+        .whereType<DisabilityTypeOption>()
+        .toList();
+  }
+
   Future<void> loadIncidents() async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-    try {
-      _incidents = await _repository.fetchIncidents();
-    } catch (e) {
-      _errorMessage = 'ไม่สามารถโหลดรายการเหตุได้ กรุณาลองใหม่อีกครั้ง';
-      if (kDebugMode) {
-        debugPrint('Failed to load incidents: $e');
-      }
-    } finally {
-      _isLoading = false;
+    _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (_currentUserId == null) {
+      _incidents = [];
+      _errorMessage = 'กรุณาเข้าสู่ระบบเพื่อดูหมุดที่บันทึกไว้';
       notifyListeners();
+      return;
     }
+
+    _errorMessage = null;
+    _isLoading = true;
+    notifyListeners();
+
+    await _incidentsSubscription?.cancel();
+    _incidentsSubscription = _repository.watchBookmarkedIncidents(_currentUserId!).listen(
+      (incidents) {
+        if (_isDisposed) return;
+        _incidents = incidents;
+        _isLoading = false;
+        _errorMessage = null;
+        notifyListeners();
+      },
+      onError: (e) {
+        if (_isDisposed) return;
+        _errorMessage = 'ไม่สามารถโหลดรายการเหตุได้ กรุณาลองใหม่อีกครั้ง';
+        _isLoading = false;
+        if (kDebugMode) {
+          debugPrint('Failed to load incidents: $e');
+        }
+        notifyListeners();
+      },
+    );
   }
 
   Future<void> refresh() => loadIncidents();
@@ -307,4 +342,34 @@ class IncidentReportViewModel extends ChangeNotifier {
   }
 
   double _degreesToRadians(double degrees) => degrees * (pi / 180);
+
+  bool isBookmarked(Incident incident) {
+    if (_currentUserId == null) return false;
+    return incident.bookmarkedBy.contains(_currentUserId);
+  }
+
+  Future<void> toggleBookmark(Incident incident) async {
+    final userId = _currentUserId ?? FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+    try {
+      await _repository.toggleBookmark(
+        incidentId: incident.id,
+        userId: userId,
+        isBookmarked: isBookmarked(incident),
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to toggle bookmark: $e');
+      }
+      _errorMessage ??= 'บันทึกหมุดไม่สำเร็จ กรุณาลองใหม่';
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _incidentsSubscription?.cancel();
+    super.dispose();
+  }
 }

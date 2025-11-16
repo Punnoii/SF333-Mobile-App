@@ -4,9 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../constants/disability_types.dart';
 import '../services/theme_service.dart';
 
-class IncidentDetailScreen extends StatelessWidget {
+class IncidentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> incident;
   final String incidentId;
   
@@ -16,11 +17,29 @@ class IncidentDetailScreen extends StatelessWidget {
     required this.incidentId,
   });
 
+  @override
+  State<IncidentDetailScreen> createState() => _IncidentDetailScreenState();
+}
+
+class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
+  bool _isBookmarked = false;
+  bool _bookmarkBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    final bookmarkedBy = widget.incident['bookmarkedBy'];
+    if (userId != null && bookmarkedBy is Iterable) {
+      _isBookmarked = bookmarkedBy.map((e) => e?.toString()).contains(userId);
+    }
+  }
+
   Future<void> _deleteIncident(BuildContext context) async {
     try {
       await FirebaseFirestore.instance
           .collection('incidents')
-          .doc(incidentId)
+          .doc(widget.incidentId)
           .delete();
       
       if (context.mounted) {
@@ -42,7 +61,7 @@ class IncidentDetailScreen extends StatelessWidget {
     try {
       await FirebaseFirestore.instance
           .collection('incidents')
-          .doc(incidentId)
+          .doc(widget.incidentId)
           .update({
         'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
@@ -90,12 +109,12 @@ class IncidentDetailScreen extends StatelessWidget {
   }
 
   String? _getReadableAddress() {
-    final formatted = incident['formattedAddress'];
+    final formatted = widget.incident['formattedAddress'];
     if (formatted is String && formatted.trim().isNotEmpty) {
       return formatted;
     }
 
-    final rawAddress = incident['address'];
+    final rawAddress = widget.incident['address'];
     if (rawAddress is Map<String, dynamic>) {
       final parts = [
         rawAddress['houseNumber'],
@@ -119,30 +138,84 @@ class IncidentDetailScreen extends StatelessWidget {
   }
 
   String? _getCoordinateText() {
-    final lat = incident['latitude'];
-    final lng = incident['longitude'];
+    final lat = widget.incident['latitude'];
+    final lng = widget.incident['longitude'];
     if (lat is num && lng is num) {
       return 'ละติจูด ${lat.toStringAsFixed(4)}, ลองจิจูด ${lng.toStringAsFixed(4)}';
     }
     return null;
   }
 
+  List<DisabilityTypeOption> _getDisabilityTypes() {
+    final types = widget.incident['affectedDisabilityTypes'];
+    if (types is Iterable) {
+      return types
+          .map((value) => DisabilityTypes.get(value?.toString()))
+          .whereType<DisabilityTypeOption>()
+          .toList();
+    }
+    return [];
+  }
+
+  Future<void> _toggleBookmark() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _bookmarkBusy) return;
+    setState(() {
+      _bookmarkBusy = true;
+    });
+    try {
+      await FirebaseFirestore.instance.collection('incidents').doc(widget.incidentId).update({
+        'bookmarkedBy': _isBookmarked
+            ? FieldValue.arrayRemove([user.uid])
+            : FieldValue.arrayUnion([user.uid]),
+      });
+      if (mounted) {
+        setState(() {
+          _isBookmarked = !_isBookmarked;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('บันทึกหมุดไม่สำเร็จ กรุณาลองอีกครั้ง')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _bookmarkBusy = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final reportedAt = incident['reportedAt'] as Timestamp? ?? incident['timestamp'] as Timestamp?;
-    final imageUrl = incident['imageUrl'] as String?;
+    final reportedAt =
+        widget.incident['reportedAt'] as Timestamp? ?? widget.incident['timestamp'] as Timestamp?;
+    final imageUrl = widget.incident['imageUrl'] as String?;
     final currentUser = FirebaseAuth.instance.currentUser;
-    final isOwner = currentUser?.uid == incident['reportedBy'];
+    final isOwner = currentUser?.uid == widget.incident['reportedBy'];
     final themeService = Provider.of<ThemeService>(context);
     final isDark = themeService.isDarkMode;
     final addressText = _getReadableAddress();
     final coordinateText = _getCoordinateText();
+    final disabilityTypes = _getDisabilityTypes();
+    final canBookmark = currentUser != null;
     
     return Scaffold(
       appBar: AppBar(
-        title: Text(incident['title'] ?? 'รายละเอียดเหตุ'),
+        title: Text(widget.incident['title'] ?? 'รายละเอียดเหตุ'),
         backgroundColor: isDark ? Colors.black : Colors.white,
         actions: [
+          if (canBookmark)
+            IconButton(
+              icon: Icon(
+                _isBookmarked ? Icons.star : Icons.star_border,
+                color: _isBookmarked ? Colors.amber : (isDark ? Colors.grey[400] : Colors.grey[700]),
+              ),
+              onPressed: _bookmarkBusy ? null : _toggleBookmark,
+            ),
           if (isOwner)
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
@@ -190,11 +263,11 @@ class IncidentDetailScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: _getCategoryColor(incident['category']),
+                color: _getCategoryColor(widget.incident['category']),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                incident['category'] ?? 'ไม่ทราบประเภท',
+                widget.incident['category'] ?? 'ไม่ทราบประเภท',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -203,10 +276,34 @@ class IncidentDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            if (disabilityTypes.isNotEmpty) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: disabilityTypes.map((type) {
+                  final bgColor = type.color.withValues(alpha: isDark ? 0.25 : 0.15);
+                  return Chip(
+                    label: Text(
+                      type.label,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    avatar: Icon(type.icon, size: 18, color: type.color),
+                    backgroundColor: bgColor,
+                    shape: StadiumBorder(
+                      side: BorderSide(color: type.color.withValues(alpha: 0.6)),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
             
             // Title
             Text(
-              incident['title'] ?? 'ยังไม่มีชื่อเหตุ',
+              widget.incident['title'] ?? 'ยังไม่มีชื่อเหตุ',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -238,11 +335,11 @@ class IncidentDetailScreen extends StatelessWidget {
             FutureBuilder<DocumentSnapshot>(
               future: FirebaseFirestore.instance
                   .collection('users')
-                  .doc(incident['reportedBy'])
+                  .doc(widget.incident['reportedBy'])
                   .get(),
               builder: (context, snapshot) {
                 final userData = snapshot.data?.data() as Map<String, dynamic>?;
-                final reporterName = userData?['email']?.split('@')[0] ?? incident['reporterEmail']?.split('@')[0] ?? 'ไม่ทราบผู้ใช้';
+                final reporterName = userData?['email']?.split('@')[0] ?? widget.incident['reporterEmail']?.split('@')[0] ?? 'ไม่ทราบผู้ใช้';
                 
                 return Row(
                   children: [
@@ -301,7 +398,8 @@ class IncidentDetailScreen extends StatelessWidget {
             ],
             
             // Description
-            if (incident['description'] != null && incident['description'].toString().isNotEmpty) ...[
+            if (widget.incident['description'] != null &&
+                widget.incident['description'].toString().isNotEmpty) ...[
               Text(
                 'รายละเอียด',
                 style: TextStyle(
@@ -312,7 +410,7 @@ class IncidentDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                incident['description'],
+                widget.incident['description'],
                 style: TextStyle(
                   fontSize: 16, 
                   height: 1.5,
@@ -329,11 +427,11 @@ class IncidentDetailScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(incident['status']),
+                    color: _getStatusColor(widget.incident['status']),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    _getStatusText(incident['status']),
+                    _getStatusText(widget.incident['status']),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -346,7 +444,7 @@ class IncidentDetailScreen extends StatelessWidget {
             const SizedBox(height: 20),
             
             // Fixer information (if in progress or completed)
-            if (incident['fixerId'] != null) ...[
+            if (widget.incident['fixerId'] != null) ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -377,7 +475,7 @@ class IncidentDetailScreen extends StatelessWidget {
                     FutureBuilder<DocumentSnapshot>(
                       future: FirebaseFirestore.instance
                           .collection('users')
-                          .doc(incident['fixerId'])
+                          .doc(widget.incident['fixerId'])
                           .get(),
                       builder: (context, snapshot) {
                         final userData = snapshot.data?.data() as Map<String, dynamic>?;
@@ -413,7 +511,7 @@ class IncidentDetailScreen extends StatelessWidget {
                         );
                       },
                     ),
-                    if (incident['fixerDetails'] != null) ...[
+                    if (widget.incident['fixerDetails'] != null) ...[
                       const SizedBox(height: 12),
                       Text(
                         'รายละเอียดการแก้ไข:',
@@ -424,18 +522,18 @@ class IncidentDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        incident['fixerDetails'],
+                        widget.incident['fixerDetails'],
                         style: TextStyle(
                           color: isDark ? Colors.grey[300] : Colors.grey[700],
                         ),
                       ),
                     ],
-                    if (incident['fixerImageUrl'] != null) ...[
+                    if (widget.incident['fixerImageUrl'] != null) ...[
                       const SizedBox(height: 12),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: CachedNetworkImage(
-                          imageUrl: incident['fixerImageUrl'],
+                          imageUrl: widget.incident['fixerImageUrl'],
                           width: double.infinity,
                           height: 150,
                           fit: BoxFit.cover,
@@ -455,10 +553,10 @@ class IncidentDetailScreen extends StatelessWidget {
             ],
             
             // Approval button for reporter when work is submitted
-            if (incident['status'] == 'in_progress' && 
-                incident['fixerId'] != null && 
-                incident['fixerDetails'] != null &&
-                currentUser?.uid == incident['reportedBy']) ...[
+            if (widget.incident['status'] == 'in_progress' && 
+                widget.incident['fixerId'] != null && 
+                widget.incident['fixerDetails'] != null &&
+                currentUser?.uid == widget.incident['reportedBy']) ...[
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),

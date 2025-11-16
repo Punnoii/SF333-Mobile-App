@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../services/location_service.dart';
 import '../services/logging_service.dart';
+import '../constants/disability_types.dart';
 import 'chat_list_screen.dart';
 import 'profile_screen.dart';
 import 'incident_detail_screen.dart';
@@ -43,6 +44,8 @@ class _MainMapScreenState extends State<MainMapScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _showSearchResults = false;
   List<Map<String, dynamic>> _searchResults = [];
+  String _statusFilter = 'all';
+  final Set<String> _disabilityFilters = {};
 
   @override
   void initState() {
@@ -1447,6 +1450,11 @@ class _MainMapScreenState extends State<MainMapScreen> {
             right: 16,
             child: _buildSearchBar(isDark),
           ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 16,
+            right: 16,
+            child: _buildFilterButton(isDark),
+          ),
           if (_showSearchResults && _searchResults.isNotEmpty)
             Positioned(
               top: MediaQuery.of(context).padding.top + 78,
@@ -1515,6 +1523,169 @@ class _MainMapScreenState extends State<MainMapScreen> {
           }
         },
       ),
+    );
+  }
+
+  Widget _buildFilterButton(bool isDark) {
+    final hasFilter = _statusFilter != 'all' || _disabilityFilters.isNotEmpty;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openFiltersSheet(isDark),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.black.withValues(alpha: 0.8) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.filter_list, color: isDark ? Colors.tealAccent : Colors.teal),
+              const SizedBox(width: 8),
+              Text(
+                hasFilter ? 'ตัวกรองถูกใช้' : 'ตัวกรอง',
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              ),
+              if (hasFilter) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.brightness_1, size: 8, color: Colors.teal),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openFiltersSheet(bool isDark) async {
+    final statusOptions = const [
+      {'value': 'all', 'label': 'ทุกสถานะ'},
+      {'value': 'pending', 'label': 'รอแจ้ง'},
+      {'value': 'in_progress', 'label': 'กำลังดำเนินการ'},
+      {'value': 'resolved', 'label': 'แก้ไขแล้ว'},
+      {'value': 'completed', 'label': 'เสร็จสิ้น'},
+      {'value': 'closed', 'label': 'ปิดเหตุ'},
+    ];
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[700] : Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'สถานะ',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: statusOptions.map((option) {
+                  final value = option['value']!;
+                  final selected = _statusFilter == value;
+                  return ChoiceChip(
+                    label: Text(option['label']!),
+                    selected: selected,
+                    onSelected: (_) {
+                      setState(() {
+                        _statusFilter = value;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'ประเภทผู้พิการที่ได้รับผลกระทบ',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: DisabilityTypes.options.map((type) {
+                  final selected = _disabilityFilters.contains(type.value);
+                  return FilterChip(
+                    label: Text(type.label),
+                    avatar: Icon(type.icon, size: 16, color: selected ? Colors.white : type.color),
+                    selected: selected,
+                    onSelected: (value) {
+                      setState(() {
+                        if (value) {
+                          _disabilityFilters.add(type.value);
+                        } else {
+                          _disabilityFilters.remove(type.value);
+                        }
+                      });
+                    },
+                    selectedColor: type.color,
+                    checkmarkColor: Colors.white,
+                    labelStyle: TextStyle(
+                      color: selected ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _statusFilter = 'all';
+                        _disabilityFilters.clear();
+                      });
+                      Navigator.pop(context);
+                    },
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('ล้างตัวกรอง'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('ปิด'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1664,7 +1835,28 @@ class _MainMapScreenState extends State<MainMapScreen> {
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) return const SizedBox.shrink();
                   
-                  final incidents = snapshot.data!.docs;
+                  Iterable<QueryDocumentSnapshot> incidents = snapshot.data!.docs;
+
+                  if (_statusFilter != 'all') {
+                    incidents = incidents.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final status = data['status']?.toString() ?? 'pending';
+                      return status == _statusFilter;
+                    });
+                  }
+
+                  if (_disabilityFilters.isNotEmpty) {
+                    incidents = incidents.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final types = data['affectedDisabilityTypes'];
+                      if (types is Iterable) {
+                        final values = types.map((e) => e?.toString()).whereType<String>().toSet();
+                        return values.intersection(_disabilityFilters).isNotEmpty;
+                      }
+                      return false;
+                    });
+                  }
+
                   return MarkerLayer(
                     markers: incidents.map((doc) {
                       final data = doc.data() as Map<String, dynamic>;

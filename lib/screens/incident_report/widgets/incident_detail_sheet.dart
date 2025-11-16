@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../constants/disability_types.dart';
 import '../../../models/incident.dart';
 import '../incident_report_styles.dart';
 
@@ -10,16 +11,22 @@ class IncidentDetailSheet extends StatelessWidget {
     required this.isDark,
     required this.statusLabel,
     required this.categoryLabel,
+    required this.disabilityTypes,
     required this.locationText,
     required this.timeAgo,
+    this.onToggleBookmark,
+    this.isBookmarked = false,
   });
 
   final Incident incident;
   final bool isDark;
   final String statusLabel;
   final String categoryLabel;
+  final List<DisabilityTypeOption> disabilityTypes;
   final String? locationText;
   final String timeAgo;
+  final VoidCallback? onToggleBookmark;
+  final bool isBookmarked;
 
   @override
   Widget build(BuildContext context) {
@@ -48,13 +55,29 @@ class IncidentDetailSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    incident.title.isNotEmpty ? incident.title : 'ยังไม่มีชื่อเหตุ',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          incident.title.isNotEmpty ? incident.title : 'ยังไม่มีชื่อเหตุ',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      if (onToggleBookmark != null)
+                        IconButton(
+                          icon: Icon(
+                            isBookmarked ? Icons.star : Icons.star_border,
+                            color: isBookmarked
+                                ? Colors.amber
+                                : (isDark ? Colors.grey[500] : Colors.grey[600]),
+                          ),
+                          onPressed: onToggleBookmark,
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -84,6 +107,35 @@ class IncidentDetailSheet extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (disabilityTypes.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: disabilityTypes.map((type) {
+                        final backgroundColor =
+                            type.color.withValues(alpha: isDark ? 0.25 : 0.15);
+                        return Chip(
+                          label: Text(
+                            type.label,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          avatar: Icon(
+                            type.icon,
+                            size: 18,
+                            color: type.color,
+                          ),
+                          backgroundColor: backgroundColor,
+                          shape: StadiumBorder(
+                            side: BorderSide(color: type.color.withValues(alpha: 0.6)),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   if (incident.description.isNotEmpty) ...[
                     Text(
