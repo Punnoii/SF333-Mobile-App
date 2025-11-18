@@ -1,17 +1,102 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
-import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'dart:math';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'incident_detail_screen.dart';
 import '../constants/disability_types.dart';
 import '../services/cloudinary_service.dart';
 import '../services/theme_service.dart';
+
+String statusLabel(String status) {
+  switch (status) {
+    case 'pending':
+      return 'รอแจ้ง';
+    case 'in_progress':
+      return 'กำลังดำเนินการ';
+    case 'resolved':
+      return 'แก้ไขแล้ว';
+    case 'completed':
+      return 'เสร็จสิ้น';
+    case 'closed':
+      return 'ปิดเหตุ';
+    default:
+      return 'ไม่ทราบสถานะ';
+  }
+}
+
+Color statusColor(String status) {
+  switch (status) {
+    case 'pending':
+      return Colors.orange;
+    case 'in_progress':
+      return Colors.blue;
+    case 'completed':
+    case 'resolved':
+      return Colors.green;
+    default:
+      return Colors.grey;
+  }
+}
+
+double? distanceInKm(Position? currentPosition, dynamic lat, dynamic lng) {
+  if (currentPosition == null || lat is! num || lng is! num) return null;
+  const double earthRadius = 6371;
+  final double latDiff = _degreesToRadians(lat.toDouble() - currentPosition.latitude);
+  final double lngDiff = _degreesToRadians(lng.toDouble() - currentPosition.longitude);
+  final double a = sin(latDiff / 2) * sin(latDiff / 2) +
+      cos(_degreesToRadians(currentPosition.latitude)) *
+          cos(_degreesToRadians(lat.toDouble())) *
+          sin(lngDiff / 2) *
+          sin(lngDiff / 2);
+  final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+  return earthRadius * c;
+}
+
+String? readableAddress(Map<String, dynamic> data) {
+  final formatted = data['formattedAddress'];
+  if (formatted is String && formatted.trim().isNotEmpty) {
+    return formatted;
+  }
+  final address = data['address'];
+  if (address is Map<String, dynamic>) {
+    final parts = [
+      address['houseNumber'],
+      address['road'],
+      address['subdistrict'],
+      address['district'],
+      address['province'],
+      address['postcode'],
+    ]
+        .whereType<String>()
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList();
+    if (parts.isNotEmpty) {
+      return parts.join(' ');
+    }
+  }
+  return null;
+}
+
+String? coordinateLabel(Map<String, dynamic> data) {
+  final lat = data['latitude'];
+  final lng = data['longitude'];
+  if (lat is num && lng is num) {
+    return 'ละติจูด ${lat.toStringAsFixed(4)}, ลองจิจูด ${lng.toStringAsFixed(4)}';
+  }
+  return null;
+}
+
+double _degreesToRadians(double degrees) {
+  return degrees * (pi / 180);
+}
 
 class IncidentStatusScreen extends StatefulWidget {
   static const String routeName = '/incident-status';
@@ -68,6 +153,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingLocation = true;
     });
@@ -92,6 +178,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
       }
 
       final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
       setState(() {
         _currentPosition = position;
       });
@@ -103,6 +190,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
         ),
       );
     } finally {
+      if (!mounted) return;
       setState(() {
         _isLoadingLocation = false;
         if (_currentPosition == null) {
@@ -112,23 +200,6 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
     }
   }
 
-
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'pending':
-        return 'รอแจ้ง';
-      case 'in_progress':
-        return 'กำลังดำเนินการ';
-      case 'resolved':
-        return 'แก้ไขแล้ว';
-      case 'completed':
-        return 'เสร็จสิ้น';
-      case 'closed':
-        return 'ปิดเหตุ';
-      default:
-        return 'ไม่ทราบสถานะ';
-    }
-  }
 
   Future<void> _updateIncidentStatus(String incidentId, String newStatus, {String? fixerImage, String? fixerDetails}) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -152,7 +223,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
 
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('สถานะอัปเดตเป็น${_getStatusText(newStatus)}แล้ว')),
+        SnackBar(content: Text('สถานะอัปเดตเป็น${statusLabel(newStatus)}แล้ว')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -232,9 +303,16 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                   return;
                 }
 
+                final user = FirebaseAuth.instance.currentUser;
+                if (user == null) {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนรับงาน')),
+                  );
+                  return;
+                }
+
                 String? imageUrl;
                 if (selectedImage != null) {
-                  final user = FirebaseAuth.instance.currentUser!;
                   final timestamp = DateTime.now().millisecondsSinceEpoch;
                   imageUrl = await CloudinaryService.uploadProfileImage(
                     selectedImage!, 
@@ -261,7 +339,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
   Stream<QuerySnapshot> _getIncidentsStream() {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      return const Stream.empty();
+      return Stream<QuerySnapshot>.empty();
     }
 
     // Always use simple query with only reporterId filter to avoid composite index
@@ -271,20 +349,83 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
         .snapshots();
   }
 
-  double? _calculateDistanceKm(dynamic lat, dynamic lng) {
-    if (_currentPosition == null || lat is! num || lng is! num) return null;
-    const double earthRadius = 6371;
-    final double latDiff = _degreesToRadians(lat.toDouble() - _currentPosition!.latitude);
-    final double lngDiff = _degreesToRadians(lng.toDouble() - _currentPosition!.longitude);
-    final double a = sin(latDiff / 2) * sin(latDiff / 2) +
-        cos(_degreesToRadians(_currentPosition!.latitude)) * cos(_degreesToRadians(lat.toDouble())) *
-            sin(lngDiff / 2) * sin(lngDiff / 2);
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    return earthRadius * c;
+  Map<String, dynamic> _normalizeIncidentData(QueryDocumentSnapshot incident) {
+    final data = Map<String, dynamic>.from(incident.data() as Map<String, dynamic>);
+    data.putIfAbsent('reporterId', () => data['reportedBy']);
+    data.putIfAbsent(
+      'reporterEmail',
+      () => (data['reportedByEmail'] ?? data['reporterEmail'] ?? 'ไม่ทราบ').toString(),
+    );
+    return data;
   }
 
-  double _degreesToRadians(double degrees) {
-    return degrees * (pi / 180);
+  List<QueryDocumentSnapshot> _filterIncidents(List<QueryDocumentSnapshot> incidents) {
+    Iterable<QueryDocumentSnapshot> filtered = incidents;
+
+    if (_selectedStatus != 'all') {
+      filtered = filtered.where((incident) {
+        final data = incident.data() as Map<String, dynamic>;
+        final status = (data['status'] ?? 'pending').toString();
+        return status == _selectedStatus;
+      });
+    }
+
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      filtered = filtered.where((incident) {
+        final data = incident.data() as Map<String, dynamic>;
+        final searchable = <String?>[
+          data['title']?.toString(),
+          data['description']?.toString(),
+          data['formattedAddress']?.toString(),
+        ];
+        final address = data['address'];
+        if (address is Map<String, dynamic>) {
+          searchable.addAll([
+            address['houseNumber']?.toString(),
+            address['road']?.toString(),
+            address['subdistrict']?.toString(),
+            address['district']?.toString(),
+            address['province']?.toString(),
+          ]);
+        }
+        return searchable.whereType<String>().any((value) => value.toLowerCase().contains(query));
+      });
+    }
+
+    if (_onlyNearby && _currentPosition != null) {
+      filtered = filtered.where((incident) {
+        final data = incident.data() as Map<String, dynamic>;
+        final distance = distanceInKm(_currentPosition, data['latitude'], data['longitude']);
+        return distance != null && distance <= _nearbyRadiusKm;
+      });
+    }
+
+    final results = filtered.toList();
+
+    if (_onlyNearby && _currentPosition != null) {
+      results.sort((a, b) {
+        final dataA = a.data() as Map<String, dynamic>;
+        final dataB = b.data() as Map<String, dynamic>;
+        final distanceA = distanceInKm(_currentPosition, dataA['latitude'], dataA['longitude']) ?? double.infinity;
+        final distanceB = distanceInKm(_currentPosition, dataB['latitude'], dataB['longitude']) ?? double.infinity;
+        return distanceA.compareTo(distanceB);
+      });
+    } else {
+      // Always sort incidents by timestamp (descending order - newest first)
+      results.sort((a, b) {
+        final aTimestamp = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+        final bTimestamp = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+
+        if (aTimestamp == null && bTimestamp == null) return 0;
+        if (aTimestamp == null) return 1;
+        if (bTimestamp == null) return -1;
+
+        return bTimestamp.compareTo(aTimestamp); // Descending order
+      });
+    }
+
+    return results;
   }
 
   Widget _buildFilterControls(bool isDark) {
@@ -458,55 +599,16 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  List<QueryDocumentSnapshot> incidents = snapshot.data?.docs ?? [];
-
-                  // Filter by status if not 'all'
-                  List<QueryDocumentSnapshot> filteredIncidents = incidents;
-                  if (_selectedStatus != 'all') {
-                    filteredIncidents = filteredIncidents.where((incident) {
-                      final data = incident.data() as Map<String, dynamic>;
-                      final status = data['status'] ?? 'pending';
-                      return status == _selectedStatus;
-                    }).toList();
-                  }
-
-                  final query = _searchQuery.trim().toLowerCase();
-                  if (query.isNotEmpty) {
-                    filteredIncidents = filteredIncidents.where((incident) {
-                      final data = incident.data() as Map<String, dynamic>;
-                      final searchable = <String?>[
-                        data['title']?.toString(),
-                        data['description']?.toString(),
-                        data['formattedAddress']?.toString(),
-                      ];
-                      final address = data['address'];
-                      if (address is Map<String, dynamic>) {
-                        searchable.addAll([
-                          address['houseNumber']?.toString(),
-                          address['road']?.toString(),
-                          address['subdistrict']?.toString(),
-                          address['district']?.toString(),
-                          address['province']?.toString(),
-                        ]);
-                      }
-                      return searchable.whereType<String>().any((value) => value.toLowerCase().contains(query));
-                    }).toList();
-                  }
-
-                  if (_onlyNearby && _currentPosition != null) {
-                    filteredIncidents = filteredIncidents.where((incident) {
-                      final data = incident.data() as Map<String, dynamic>;
-                      final distance = _calculateDistanceKm(data['latitude'], data['longitude']);
-                      return distance != null && distance <= _nearbyRadiusKm;
-                    }).toList();
-                  }
+                  final incidents = snapshot.data?.docs ?? <QueryDocumentSnapshot>[];
+                  final filteredIncidents = _filterIncidents(incidents);
+                  final query = _searchQuery.trim();
 
                   if (filteredIncidents.isEmpty) {
                     String emptyMessage = 'ยังไม่มีการแจ้งเหตุของคุณ';
                     if (query.isNotEmpty || (_onlyNearby && _currentPosition != null)) {
                       emptyMessage = 'ไม่พบเหตุที่ตรงกับคำค้นหาหรือรัศมีที่เลือก';
                     } else if (_selectedStatus != 'all') {
-                      emptyMessage = 'ไม่พบเหตุสถานะ ${_getStatusText(_selectedStatus)}';
+                      emptyMessage = 'ไม่พบเหตุสถานะ ${statusLabel(_selectedStatus)}';
                     }
                     return Center(
                       child: Text(
@@ -520,44 +622,18 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                     );
                   }
 
-                  if (_onlyNearby && _currentPosition != null) {
-                    filteredIncidents.sort((a, b) {
-                      final dataA = a.data() as Map<String, dynamic>;
-                      final dataB = b.data() as Map<String, dynamic>;
-                      final distanceA = _calculateDistanceKm(dataA['latitude'], dataA['longitude']) ?? double.infinity;
-                      final distanceB = _calculateDistanceKm(dataB['latitude'], dataB['longitude']) ?? double.infinity;
-                      return distanceA.compareTo(distanceB);
-                    });
-                  } else {
-                    // Always sort incidents by timestamp (descending order - newest first)
-                    filteredIncidents.sort((a, b) {
-                      final aTimestamp = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-                      final bTimestamp = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-                      
-                      if (aTimestamp == null && bTimestamp == null) return 0;
-                      if (aTimestamp == null) return 1;
-                      if (bTimestamp == null) return -1;
-                      
-                      return bTimestamp.compareTo(aTimestamp); // Descending order
-                    });
-                  }
-
                   return ListView.builder(
                     itemCount: filteredIncidents.length,
                     itemBuilder: (context, index) {
                       final incident = filteredIncidents[index];
-                      final data = incident.data() as Map<String, dynamic>;
                       final incidentId = incident.id;
 
-                      // Ensure data has proper field names for compatibility
-                      final normalizedData = Map<String, dynamic>.from(data);
-                      if (!normalizedData.containsKey('reporterId') && normalizedData.containsKey('reportedBy')) {
-                        normalizedData['reporterId'] = normalizedData['reportedBy'];
-                      }
-                      if (!normalizedData.containsKey('reporterEmail') && normalizedData.containsKey('reportedBy')) {
-                        // Try to get email from user document if not available
-                        normalizedData['reporterEmail'] = 'ไม่ทราบ';
-                      }
+                      final normalizedData = _normalizeIncidentData(incident);
+                      final distanceKm = distanceInKm(
+                        _currentPosition,
+                        normalizedData['latitude'],
+                        normalizedData['longitude'],
+                      );
                       
                       return GestureDetector(
                         onTap: () {
@@ -566,7 +642,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
                         child: _IncidentCard(
                           incidentId: incidentId,
                           data: normalizedData,
-                          currentPosition: _currentPosition,
+                          distanceKm: distanceKm,
                           onStatusUpdate: _updateIncidentStatus,
                           onShowFixerDialog: _showFixerDialog,
                           onOpenDetail: _openIncidentDetail,
@@ -587,7 +663,7 @@ class _IncidentStatusScreenState extends State<IncidentStatusScreen> {
 class _IncidentCard extends StatelessWidget {
   final String incidentId;
   final Map<String, dynamic> data;
-  final Position? currentPosition;
+  final double? distanceKm;
   final Function(String, String, {String? fixerImage, String? fixerDetails}) onStatusUpdate;
   final Function(String) onShowFixerDialog;
   final Future<void> Function(BuildContext, Map<String, dynamic>, String) onOpenDetail;
@@ -595,96 +671,11 @@ class _IncidentCard extends StatelessWidget {
   const _IncidentCard({
     required this.incidentId,
     required this.data,
-    this.currentPosition,
+    this.distanceKm,
     required this.onStatusUpdate,
     required this.onShowFixerDialog,
     required this.onOpenDetail,
   });
-
-  double? _getDistance() {
-    if (currentPosition == null) return null;
-    
-    final lat = data['latitude'] as double?;
-    final lng = data['longitude'] as double?;
-    
-    if (lat == null || lng == null) return null;
-    
-    const double earthRadius = 6371;
-    double dLat = _degreesToRadians(lat - currentPosition!.latitude);
-    double dLon = _degreesToRadians(lng - currentPosition!.longitude);
-    
-    double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_degreesToRadians(currentPosition!.latitude)) * cos(_degreesToRadians(lat)) *
-        sin(dLon / 2) * sin(dLon / 2);
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    
-    return earthRadius * c;
-  }
-
-  double _degreesToRadians(double degrees) {
-    return degrees * (pi / 180);
-  }
-
-  String? _getReadableAddress() {
-    final formatted = data['formattedAddress'];
-    if (formatted is String && formatted.trim().isNotEmpty) {
-      return formatted;
-    }
-    final address = data['address'];
-    if (address is Map<String, dynamic>) {
-      final parts = [
-        address['houseNumber'],
-        address['road'],
-        address['subdistrict'],
-        address['district'],
-        address['province'],
-        address['postcode'],
-      ]
-          .whereType<String>()
-          .map((value) => value.trim())
-          .where((value) => value.isNotEmpty)
-          .toList();
-      if (parts.isNotEmpty) {
-        return parts.join(' ');
-      }
-    }
-    return null;
-  }
-
-  String? _getCoordinateText() {
-    final lat = data['latitude'];
-    final lng = data['longitude'];
-    if (lat is num && lng is num) {
-      return 'ละติจูด ${lat.toStringAsFixed(4)}, ลองจิจูด ${lng.toStringAsFixed(4)}';
-    }
-    return null;
-  }
-
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'pending':
-        return 'รอแจ้ง';
-      case 'in_progress':
-        return 'กำลังดำเนินการ';
-      case 'completed':
-        return 'เสร็จสิ้น';
-      default:
-        return 'ไม่ทราบสถานะ';
-    }
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return Colors.orange;
-      case 'in_progress':
-        return Colors.blue;
-      case 'completed':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
 
   List<DisabilityTypeOption> _getDisabilityTypes() {
     final types = data['affectedDisabilityTypes'];
@@ -702,9 +693,11 @@ class _IncidentCard extends StatelessWidget {
     final themeService = Provider.of<ThemeService>(context);
     final isDark = themeService.isDarkMode;
     final currentUser = FirebaseAuth.instance.currentUser;
-    final status = data['status'] ?? 'pending';
-    final distance = _getDistance();
+    final status = (data['status'] ?? 'pending').toString();
+    final distance = distanceKm;
     final disabilityTypes = _getDisabilityTypes();
+    final address = readableAddress(data);
+    final coordinates = coordinateLabel(data);
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -730,7 +723,7 @@ class _IncidentCard extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: _getStatusColor(status).withValues(alpha: 0.3),
+              color: statusColor(status).withValues(alpha: 0.3),
               width: 2,
             ),
           ),
@@ -744,11 +737,11 @@ class _IncidentCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _getStatusColor(status),
+                        color: statusColor(status),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        _getStatusText(status),
+                        statusLabel(status),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -817,7 +810,7 @@ class _IncidentCard extends StatelessWidget {
                     }).toList(),
                   ),
                 ],
-                if (_getReadableAddress() != null || _getCoordinateText() != null) ...[
+                if (address != null || coordinates != null) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -825,7 +818,7 @@ class _IncidentCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          _getReadableAddress() ?? _getCoordinateText()!,
+                          address ?? coordinates!,
                           style: TextStyle(
                             color: isDark ? Colors.grey[300] : Colors.grey[700],
                           ),
@@ -860,25 +853,25 @@ class _IncidentCard extends StatelessWidget {
                     Icon(Icons.person, size: 16, color: isDark ? Colors.grey[400] : Colors.grey[600]),
                     const SizedBox(width: 4),
                     FutureBuilder<DocumentSnapshot>(
-                  future: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(data['reporterId'] ?? data['reportedBy'])
-                      .get(),
-                  builder: (context, snapshot) {
-                    final userData = snapshot.data?.data() as Map<String, dynamic>?;
-                    final reporterName = userData?['email']?.split('@')[0] ?? 
-                                       data['reporterEmail']?.split('@')[0] ?? 
-                                       'ไม่ทราบผู้แจ้ง';
-                    
-                    return Text(
-                      reporterName,
+                      future: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(data['reporterId'] ?? data['reportedBy'])
+                          .get(),
+                      builder: (context, snapshot) {
+                        final userData = snapshot.data?.data() as Map<String, dynamic>?;
+                        final reporterName = userData?['email']?.split('@')[0] ??
+                            data['reporterEmail']?.split('@')[0] ??
+                            'ไม่ทราบผู้แจ้ง';
+
+                        return Text(
+                          reporterName,
                           style: TextStyle(
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                    );
-                  },
-                ),
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        );
+                      },
+                    ),
                     const Spacer(),
                     if (data['timestamp'] != null)
                       Text(
@@ -983,7 +976,6 @@ class _IncidentCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          //TODO dont know this function . check later
                           child: const Text('ขอรับงาน'),
                         ),
                       ),
